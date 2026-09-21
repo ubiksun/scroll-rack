@@ -12,12 +12,15 @@ fully automatic. The Web Store is the only way testers get true auto-update.
 
 ## Release a new version
 
+Repo: https://github.com/ubiksun/scroll-rack (public; created 2026-09-21 via `git subtree split --prefix=Areas/MTG/tools/limited-grader -b scroll-rack-public` from the monorepo — the monorepo stays the dev source, never push it).
+
+
 1. Bump `"version"` in `public/manifest.json` (e.g. 0.6.0 → 0.6.1).
 2. `scripts/release.sh "one-line notes"` → builds and writes:
    - `release/scroll-rack-vX.zip` — for zip-channel users (has README)
    - `release/store-vX.zip` — upload this to the Web Store dashboard
    - `release/latest.json` — what installed copies poll (via GitHub raw) to show the update banner
-3. Push to the public repo `ubiksun/scroll-rack` and create a GitHub Release tagged `vX` with `scroll-rack-vX.zip`
+3. From the monorepo: commit → `git subtree split --prefix=Areas/MTG/tools/limited-grader -b scroll-rack-public` → `git push https://github.com/ubiksun/scroll-rack.git scroll-rack-public:main` → create a GitHub Release tagged `vX` with `scroll-rack-vX.zip`
    attached (the URL in latest.json points there):
    `gh release create vX release/scroll-rack-vX.zip --title "vX" --notes "…"`
 4. Web Store: dashboard → the item → Package → Upload new package → `store-vX.zip` → Submit. Unlisted items still go
