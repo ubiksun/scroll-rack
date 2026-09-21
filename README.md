@@ -7,19 +7,26 @@ own syntax (proxied to the API).
 
 Project memory: Obsidian vault `claude/projects/MTG限制賽評分工具.md`.
 
-## Build & load
+## Install (users)
+
+- **Chrome Web Store** — coming soon (unlisted beta first).
+- **Zip** — grab `scroll-rack-vX.Y.Z.zip` from [Releases](https://github.com/ubiksun/scroll-rack/releases), unzip it
+  somewhere permanent, then Chrome → `chrome://extensions` → Developer mode → **Load unpacked** → pick the unzipped folder.
+  To upgrade, unzip the new version over the same folder and hit ↻ on the extension card — your data lives in Chrome's
+  profile, not in the folder. Full steps in `release/INSTALL.md`.
+
+## Build (developers)
 
 ```
 npm install
-npm run build        # → dist/
+npm run build        # → dist/  (this is the folder you load unpacked)
+npm run watch        # rebuild on change; then ↻ the extension card
 ```
 
-Chrome → `chrome://extensions` → Developer mode → **Load unpacked** → pick `dist/`.
-Click the toolbar icon to open the grader in a tab. Re-run `npm run build` (or `npm run watch`) and hit ↻ on the
-extension card after code changes.
+Quick UI preview without loading the extension: `npx vite preview --host 127.0.0.1 --port 4173`. Everything works except
+the parts that need `chrome.*` (the scryfall.com overlay, the Tagger option, the version check).
 
-Quick preview without Chrome extension packaging: `npx vite preview --host 127.0.0.1 --port 4173` — the app page uses no
-`chrome.*` APIs, only `background.js` does.
+Release: bump `version` in `public/manifest.json` → `scripts/release.sh "notes"` → see `release/PUBLISH.md`.
 
 ## Data
 
