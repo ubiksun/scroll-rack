@@ -1,0 +1,5 @@
+{
+  "extName": { "message": "Scroll Rack", "description": "Extension name" },
+  "extDesc": { "message": "A Scryfall companion for serious Magic players: your own tier ratings, tags and notes on every card, kept locally.", "description": "Short description (≤132 chars)" },
+  "actionTitle": { "message": "Open Scroll Rack", "description": "Toolbar button tooltip" }
+}

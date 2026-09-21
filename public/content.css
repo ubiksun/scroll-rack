@@ -1,0 +1,41 @@
+/* Scroll Rack — scryfall.com overlay */
+.lg-panel { position: fixed; z-index: 99999; width: 300px; background: #FDFDFD; color: #16161D; border: 1px solid #E0DEE3; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.5); font: 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+.lg-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #2B253A; color: #FDFDFD; border-radius: 10px 10px 0 0; cursor: grab; user-select: none; }
+.lg-title { font-weight: 700; font-size: 12px; letter-spacing: .04em; color: #CBAAF5; }
+.lg-tools { display: flex; gap: 4px; }
+.lg-btn { background: #fff; color: #16161D; border: 1px solid #E0DEE3; border-radius: 5px; padding: 1px 7px; cursor: pointer; font: inherit; font-size: 12px; }
+.lg-btn:hover { border-color: #634496; }
+.lg-head .lg-btn { background: #3d3550; color: #fff; border-color: #4a4160; }
+.lg-btn.lg-wide { width: 100%; margin-top: 6px; padding: 6px; }
+.lg-collapsed .lg-body, .lg-collapsed .lg-chooser { display: none; }
+.lg-body { padding: 8px 10px; max-height: 70vh; overflow: auto; }
+.lg-sec { padding: 6px 0; border-bottom: 1px solid #E0DEE3; }
+.lg-sec:last-child { border-bottom: 0; }
+.lg-h { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #5F4F66; margin-bottom: 4px; }
+.lg-muted { color: #5F4F66; font-size: 12px; }
+.lg-ctx { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 6px; }
+.lg-ctx.lg-active { background: #EFF0F7; }
+.lg-ctx-name { width: 80px; flex: none; color: #5F4F66; font-size: 12px; }
+.lg-tiers { display: flex; flex-wrap: wrap; gap: 4px; }
+.lg-tier { background: transparent; color: #16161D; border: 1px solid; border-radius: 5px; padding: 1px 7px; min-width: 28px; font: inherit; font-weight: 700; font-size: 12px; cursor: pointer; }
+.lg-tier.lg-on { color: #fff; }
+.lg-note { width: 100%; min-height: 70px; box-sizing: border-box; background: #fff; color: #16161D; border: 1px solid #E0DEE3; border-radius: 6px; padding: 4px 6px; font: inherit; resize: vertical; }
+.lg-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.lg-chip { background: #EFF0F7; border: 1px solid #E0DEE3; border-radius: 12px; padding: 1px 8px; font-size: 12px; }
+.lg-x { margin-left: 5px; color: #5F4F66; cursor: pointer; }
+.lg-tag-in { width: 90px; background: #fff; color: #16161D; border: 1px solid #E0DEE3; border-radius: 6px; padding: 2px 6px; font: inherit; font-size: 12px; }
+.lg-link { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
+.lg-type { font-size: 11px; color: #5F4F66; border: 1px solid #E0DEE3; border-radius: 4px; padding: 0 4px; }
+.lg-name { color: #634496; text-decoration: none; } .lg-name:hover { text-decoration: underline; }
+.lg-kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+.lg-kv b { color: #5F4F66; font-weight: 500; }
+.lg-chooser { padding: 6px 10px; border-top: 1px solid #E0DEE3; }
+.lg-chooser-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 12px; }
+.lg-chooser-row span { flex: 1; }
+.lg-badges { position: absolute; z-index: 5; display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
+.lg-pos-tl { top: 8px; left: 8px; } .lg-pos-tr { top: 8px; right: 8px; align-items: flex-end; } .lg-pos-bl { bottom: 8px; left: 8px; flex-direction: column-reverse; } .lg-pos-br { bottom: 8px; right: 8px; flex-direction: column-reverse; align-items: flex-end; }
+.lg-shape-circle { border-radius: 50% !important; min-width: 1.9em; height: 1.9em; padding: 0 !important; display: inline-flex; align-items: center; justify-content: center; }
+.lg-shape-square { border-radius: 4px !important; }
+.lg-size-s { font-size: 10px !important; padding: 1px 6px !important; } .lg-size-l { font-size: 16px !important; padding: 3px 11px !important; }
+.lg-badge { padding: 2px 8px; border-radius: 12px; font-weight: 700; font-size: 13px; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.card-image-front .lg-pos-tl { top: 14px; left: 14px; } .card-image-front .lg-pos-tr { top: 14px; right: 14px; } .card-image-front .lg-pos-bl { bottom: 14px; left: 14px; } .card-image-front .lg-pos-br { bottom: 14px; right: 14px; } .card-image-front .lg-badge { font-size: 15px; padding: 3px 10px; }

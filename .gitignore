@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+# built packages live on GitHub Releases, not in git; latest.json / INSTALL.md / PUBLISH.md are tracked
+release/*.zip
+release/screenshots/*
+release/screenshots/*

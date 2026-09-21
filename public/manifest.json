@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "default_locale": "en",
+  "name": "__MSG_extName__",
+  "version": "0.9.7",
+  "description": "__MSG_extDesc__",
+  "action": {
+    "default_title": "__MSG_actionTitle__",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "declarativeNetRequest",
+    "storage",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://api.scryfall.com/*",
+    "https://cards.scryfall.io/*",
+    "https://images.mtgch.com/*",
+    "https://mtgch.com/*",
+    "https://raw.githubusercontent.com/*",
+    "https://tagger.scryfall.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://scryfall.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

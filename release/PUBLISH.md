@@ -1,0 +1,91 @@
+# Publishing / updating — how it works
+
+## Two channels
+
+| Channel | Who | Install | Updates |
+|---|---|---|---|
+| **Chrome Web Store, visibility = Unlisted** | testers with the link | one click | automatic (Chrome checks every few hours) |
+| **Zip (unpacked)** | you / power users / before store approval | Load unpacked | in-app banner → download → unzip over folder → ↻ |
+
+Chrome does **not** auto-update unpacked extensions and blocks off-store `.crx` installs, so the zip channel can never be
+fully automatic. The Web Store is the only way testers get true auto-update.
+
+## Release a new version
+
+1. Bump `"version"` in `public/manifest.json` (e.g. 0.6.0 → 0.6.1).
+2. `scripts/release.sh "one-line notes"` → builds and writes:
+   - `release/scroll-rack-vX.zip` — for zip-channel users (has README)
+   - `release/store-vX.zip` — upload this to the Web Store dashboard
+   - `release/latest.json` — what installed copies poll (via GitHub raw) to show the update banner
+3. Push to the public repo `ubiksun/scroll-rack` and create a GitHub Release tagged `vX` with `scroll-rack-vX.zip`
+   attached (the URL in latest.json points there):
+   `gh release create vX release/scroll-rack-vX.zip --title "vX" --notes "…"`
+4. Web Store: dashboard → the item → Package → Upload new package → `store-vX.zip` → Submit. Unlisted items still go
+   through review (usually hours to a couple of days; first submission is slowest).
+
+## Web Store first-time setup (once)
+
+- https://chrome.google.com/webstore/devconsole → register ($5 one-time).
+- New item → upload `store-v0.6.0.zip`.
+- Store listing: name, summary, description (see below), category "Productivity" or "Fun", language EN, at least one
+  1280×800 screenshot, the 128 icon is taken from the zip.
+- Privacy tab: single purpose = "personal ratings/notes/tags for MTG cards"; permission justifications:
+  `storage/unlimitedStorage` = local IndexedDB for ratings; host `api.scryfall.com`/`cards.scryfall.io` = card data & images;
+  `raw.githubusercontent.com` = update check;
+  content script on `scryfall.com` = show the user's own ratings on card pages. No remote code, no data collection.
+- Distribution → Visibility **Unlisted**. Submit.
+
+## Store listing text (paste)
+
+**Summary** (≤132 chars, same as manifest):
+A Scryfall companion for serious Magic players: your own tier ratings, tags and notes on every card, kept locally.
+
+**Description:**
+
+Scroll Rack is a notebook for how *you* evaluate Magic cards.
+
+Competitive players form opinions about hundreds of cards every season — during spoiler week, while testing, after a tournament — and most of those opinions evaporate. Scroll Rack gives them one place to land, so that when it matters (a Pro Tour testing session, a draft, a set review) you can look back at what you actually thought, card by card, and check it against how things turned out.
+
+WHAT IT DOES
+
+• Rate every card on your own scales. Define as many rating dimensions as you like — Limited, Standard, Cube, whatever you play — each with its own tier ladder (S–F, 1–10, your own words). Rate a card differently for different formats.
+• Write it down. Per-card notes for each dimension, plus free-form tags (“removal”, “build-around”, “sideboard vs. Jund”…) that carry across sets.
+• See it where you already are. Your grades appear as badges on scryfall.com — on card pages and in search results — and a floating panel lets you rate and annotate without leaving Scryfall.
+• Work the way you think. Grid, single-card flip-through, or a drag-to-tier board; multi-level sort (Notion-style); Scryfall search syntax everywhere; dockable panels you can arrange freely.
+• Review yourself later. Export any set as CSV or Markdown (Obsidian-ready) to compare your spoiler-week takes with the results.
+• Set-aware. Handles Reality Fracture’s Echoverse pairs side by side. Format dividers (Standard / Pioneer / Modern) in the set list; load a whole format with one click.
+• Bilingual card data. Switch card names, text and scans to Chinese (via 大學院廢墟 / mtgch.com); interface in English or Chinese.
+
+WHO IT’S FOR
+
+Players who take set evaluation seriously and want their own record — not another aggregated tier list. Content creators preparing set reviews. Anyone who has ever thought “I knew that card was good” and wanted proof.
+
+PRIVACY
+
+Everything stays in your browser. No account, no server, no analytics. Card data and images come from Scryfall (and optionally mtgch.com for Chinese). Back up or move your data with a one-click JSON export.
+
+Open source (MIT): https://github.com/ubiksun/scroll-rack
+
+Unofficial fan project, not affiliated with Wizards of the Coast or Scryfall.
+
+## Privacy practices tab (paste)
+
+**Single purpose description**
+Lets Magic: The Gathering players rate cards on their own tier scales and keep notes and tags for each card, viewable in the extension's own page and as badges on scryfall.com. All data is stored locally.
+
+**Permission justifications**
+
+- `storage` — Stores small UI preferences (position and section layout of the scryfall.com panel).
+- `unlimitedStorage` — Card data for the sets a user loads is cached in IndexedDB (a few hundred KB per set; users commonly load an entire format). Without this the default quota could evict the user's ratings.
+- `declarativeNetRequest` — Used for a single session rule that sets the Origin/Referer headers on the extension's own requests to tagger.scryfall.com/graphql, so the community-tags feature (optional, off by default) works from an extension origin. It affects no other traffic and no other site.
+- Host `api.scryfall.com`, `cards.scryfall.io` — Fetching card data and card images (the extension's core data source).
+- Host `mtgch.com`, `images.mtgch.com` — Fetching Chinese card names, text and scans when the user sets card language to Chinese.
+- Host `tagger.scryfall.com` — Fetching community functional tags for the current card when the user enables the experimental Tagger option.
+- Host `raw.githubusercontent.com` — Reading a small JSON file with the latest version number to show an update notice.
+- Content script on `scryfall.com` — Reads the current card's set/collector number from the page URL and search-result markup to show the user's own ratings as badges and a rating panel. No other page content is read or transmitted.
+
+**Remote code**: No, I am not using remote code.
+
+**Data usage** — tick **none** of the data types. Certify all three statements (no sale, no use unrelated to single purpose, no creditworthiness use).
+
+**Privacy policy URL**: https://github.com/ubiksun/scroll-rack/blob/main/PRIVACY.md (or the GitHub Pages copy once the repo is public).
