@@ -5,8 +5,6 @@ tier scheme), keep notes, **tag** cards, **link** cards into an Obsidian-style g
 tab AND directly on **scryfall.com** (floating panel on card pages, tier badges on search grids). Search uses Scryfall's
 own syntax (proxied to the API).
 
-Project memory: Obsidian vault `claude/projects/MTG限制賽評分工具.md`.
-
 ## Install (users)
 
 - **Chrome Web Store** — coming soon (unlisted beta first).
@@ -45,25 +43,33 @@ toolbar buttons. All panels read one store (`src/state.tsx`), so selection / fil
 
 ## Layout (files)
 
-```
-public/manifest.json   MV3 manifest: module service worker + scryfall.com content script
-public/content.css     overlay styles
-src/background.ts      service worker — opens the app tab; answers content-script messages against the extension DB
-src/content.ts         scryfall.com overlay (import-free; card-page panel + grid badges) — talks to background only
-src/messages.ts        message / payload types shared by the two above
-src/db.ts              Dexie schema v3 (contexts, ratings keyed set:oracle:context, tags, edges, artPrefs) + export/import
-src/api/scryfall.ts    set list + full-set pull (unique=prints → grouped by oracle_id; default art = lowest collector #)
-src/api/search.ts      Scryfall-syntax search proxy (e:SET (query) → oracle_ids)
-src/api/seventeen.ts   17lands snapshot + GIH percentile
-src/export.ts          JSON / CSV / Markdown-Obsidian / decklist text / graph JSON
-src/i18n.ts            EN + 中文 UI strings (t())
-src/state.tsx          GraderProvider — all app state + derived data + global keyboard, consumed by every panel
-src/App.tsx            shell: Sets picker · panel buttons · export/import · ⚙ · DockviewReact host · status bar
-src/panels/            BrowsePanel (Grid/Card/Board + filters) · GraphPanel · DetailPanel · OraclePanel · NavBar
-src/components/        CardGrid · CardPanel (collapsible per-context blocks) · BoardView (drag-to-rate) · GraphView ·
-                       SetPicker · OptionsModal · SchemeEditor · ContextEditor
-src/features.ts        feature flags (community / language / artMode currently off)
-```
+| Path | What it is |
+|---|---|
+| `public/manifest.json` | MV3 manifest — see PUBLISH.md for the permission rationale |
+| `public/_locales/` | Chrome i18n for the manifest strings (en · zh_CN · zh_TW) |
+| `public/content.css` | styles for the scryfall.com overlay |
+| `public/icons/` | 16 / 32 / 48 / 128 icons, rendered from `scripts/icon-final.jpeg` |
+| `src/main.tsx` · `App.tsx` | app page entry and shell (header, dock layout, status bar, update banner) |
+| `src/background.ts` | service worker: opens the app tab, answers content-script messages against the DB, proxies Tagger |
+| `src/content.ts` | scryfall.com content script: card-page panel, badges on card images (no imports — plain script) |
+| `src/messages.ts` | message types between content script and background |
+| `src/state.tsx` | `GraderProvider` — all app state, filters, sort, search, language layer, keyboard |
+| `src/db.ts` | Dexie schema (v6): sets · cards · ratings · contexts · schemes · cardTags · edges · artPrefs · zh · settings; export/import; Echoverse pairing |
+| `src/features.ts` | feature flags (community off · links paused · artMode off · language on) |
+| `src/i18n.ts` | UI strings EN / 中文 |
+| `src/update.ts` | version check against `release/latest.json` on GitHub |
+| `src/export.ts` | JSON · CSV · Markdown/Obsidian · decklist · graph JSON |
+| `src/api/scryfall.ts` | set list, full-set pull (all printings, grouped by oracle_id), global search, 429 backoff |
+| `src/api/search.ts` | Scryfall-syntax search scoped to the active sets |
+| `src/api/formats.ts` | Standard / Pioneer / Modern grouping for the Sets menu |
+| `src/api/mtgch.ts` | 大學院廢墟 API: Chinese names, text, scans |
+| `src/api/tagger.ts` | Scryfall Tagger community tags (experimental) |
+| `src/api/seventeen.ts` · `api/community/` | 17lands + data-source abstraction (untapped.gg reserved); layer currently off |
+| `src/panels/` | dock panels: Browse (Grid / Card / Board) · Card · Oracle · Graph (hidden) · NavBar |
+| `src/components/` | CardGrid · CardPanel · BoardView · ArtPicker · SetPicker · SortMenu · OptionsModal · TagTable · SchemeEditor · GraphView |
+| `scripts/release.sh` | build → side-load zip + store zip + latest.json |
+| `release/` | INSTALL.md (testers) · PUBLISH.md (store + release procedure) · latest.json |
+| `PRIVACY.md` | privacy policy linked from the store listing |
 
 ## Keyboard (global, when not typing)
 
