@@ -10,6 +10,11 @@ notes, **tag** cards, **link** cards into an Obsidian-style graph — in an app 
 
 **[Get it on the Chrome Web Store](https://chromewebstore.google.com/detail/scroll-rack/oejlhhgcahmkcocomlkocjccnandkmdp)** — one click, auto-updating.
 
+**Or from GitHub** — download `scroll-rack-vX.Y.Z.zip` from [Releases](https://github.com/ubiksun/scroll-rack/releases),
+unzip it somewhere permanent, then open `chrome://extensions` → turn on **Developer mode** → **Load unpacked** → pick
+the unzipped folder. To update, unzip the newer version over the same folder and hit ↻ on the extension card. Your
+ratings and notes live in Chrome's profile, not in that folder, so they survive the overwrite.
+
 ## Roadmap
 
 - Auto-tags: Scryfall Tagger `otag:` (bulk `oracle_tags`) as first source, rules-text heuristics second, LLM batch offline third
