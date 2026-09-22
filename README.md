@@ -1,13 +1,17 @@
 # Scroll Rack (Chrome extension)
 
-Your personal card-knowledge layer for MTG: rate every card per **context** (Limited / Constructed / …, each with its own
-tier scheme), keep notes, **tag** cards, **link** cards into an Obsidian-style graph, overlay **17lands** data — in a grader
-tab AND directly on **scryfall.com** (floating panel on card pages, tier badges on search grids). Search uses Scryfall's
-own syntax (proxied to the API).
+**Scroll Rack is a browser extension for rating and annotating Magic: The Gathering cards.**
 
-## Install (users)
+Rate every card on as many **comments** as you like (Limited / Constructed / …, each with its own tier ladder), keep
+notes, **tag** cards, **link** cards into an Obsidian-style graph — in an app tab AND directly on **scryfall.com**
+(floating panel on card pages, tier badges on search grids). Search uses Scryfall's own syntax (proxied to the API).
 
-- **Chrome Web Store** — coming soon (unlisted beta first).
+## Install
+
+**[Get it on the Chrome Web Store](https://chromewebstore.google.com/detail/scroll-rack/oejlhhgcahmkcocomlkocjccnandkmdp)** — one click, auto-updating.
+
+Or side-load a build that is not on the store yet:
+
 - **Zip** — grab `scroll-rack-vX.Y.Z.zip` from [Releases](https://github.com/ubiksun/scroll-rack/releases), unzip it
   somewhere permanent, then Chrome → `chrome://extensions` → Developer mode → **Load unpacked** → pick the unzipped folder.
   To upgrade, unzip the new version over the same folder and hit ↻ on the extension card — your data lives in Chrome's
@@ -37,9 +41,23 @@ Release: bump `version` in `public/manifest.json` → `scripts/release.sh "notes
 
 ## UI = docking layout (dockview)
 
-Four panels — **Browse** (Grid / Card / Board), **Graph**, **Card** (per-context tiers + notes, tags, links), **Oracle** — are
-VS Code-style tabs: drag to split, stack, or float; layout persists (⟲ layout resets). Closed panels come back from the
-toolbar buttons. All panels read one store (`src/state.tsx`), so selection / filters / ratings stay in sync.
+Panels are VS Code-style tabs: drag to split, stack, or float; layout persists (⟲ layout resets). Closed panels come back
+from the toolbar buttons.
+
+Since v0.10 the workspace is **multi-dock** — you can look at several cards while searching for more:
+
+- **Search** docks (Browse: Grid / Card / Board) each own a *private* query — search box, filters, sort, selection.
+  `+ Search` opens another one; its tab is auto-named after the query (`✎` renames it for good).
+- **Card** docks are bound to one card by value, so several can be open at once. Clicking a card in a grid **replaces**
+  that search dock's preview slot in place (VS Code preview-tab semantics, and it does not steal focus);
+  **⌘/Ctrl-click** opens an additional card dock that nothing will ever replace. `📌` turns a preview slot into a
+  permanent one.
+- **Oracle** docks follow a card dock. ⚙ Options → Oracle panel picks the shape: one *shared* panel following the
+  focused card (the v0.9.7 behaviour, default), one *attached* beneath each card dock (opens and closes with it), or no
+  separate panel at all (a section inside the card panel). Its language can be pinned independently of the card language.
+
+Card data, ratings, tags and links stay in one shared store (`src/state.tsx`); only the *question* is per-dock
+(`src/scope.tsx`), and each dock's state rides in its dockview `params`, so `dockLayout` restores the whole workspace.
 
 ## Layout (files)
 
@@ -53,7 +71,11 @@ toolbar buttons. All panels read one store (`src/state.tsx`), so selection / fil
 | `src/background.ts` | service worker: opens the app tab, answers content-script messages against the DB, proxies Tagger |
 | `src/content.ts` | scryfall.com content script: card-page panel, badges on card images (no imports — plain script) |
 | `src/messages.ts` | message types between content script and background |
-| `src/state.tsx` | `GraderProvider` — all app state, filters, sort, search, language layer, keyboard |
+| `src/state.tsx` | `GraderProvider` — the shared workspace store: cards, ratings, tags, links, prefs, language layer |
+| `src/scope.tsx` | `ScopeProvider` — one per Search dock: its query, its search, its results, its selection |
+| `src/query.ts` | the filter + multi-sort pipeline as pure functions (`runQuery`), and the serialized query shape |
+| `src/docks.ts` | dock topology: panel `params` types, id minting, open/replace/close, legacy-layout migration |
+| `src/hooks/` | `useCardSearch` (one debounced Scryfall search per dock) · `useCardData` (per-card slices) · `useDockKeyboard` |
 | `src/db.ts` | Dexie schema (v6): sets · cards · ratings · contexts · schemes · cardTags · edges · artPrefs · zh · settings; export/import; Echoverse pairing |
 | `src/features.ts` | feature flags (community off · links paused · artMode off · language on) |
 | `src/i18n.ts` | UI strings EN / 中文 |
@@ -73,7 +95,9 @@ toolbar buttons. All panels read one store (`src/state.tsx`), so selection / fil
 
 ## Keyboard (global, when not typing)
 
-`←` `→` previous / next in the current filter · `1`–`9` set tier in the first context · `n` focus its notes · `Esc` Card view → Grid
+`←` `→` previous / next in the **focused search dock**'s filter (it drives that dock's card panel) · `1`–`9` set tier in
+the first context on the **focused card dock** (falling back to the focused search dock's selection) · `n` focus that
+card dock's notes · `Esc` Card view → Grid, for that dock only.
 
 ## Not yet (roadmap)
 
@@ -87,6 +111,11 @@ toolbar buttons. All panels read one store (`src/state.tsx`), so selection / fil
 
 - Community data sources: `src/api/community/` — 17lands implemented; untapped.gg is a reserved slot (`available: false`) until its API details are known. The whole layer is off via `FEATURES.community`.
 - Feature flags (`src/features.ts`): community off · artMode off (per-card pin still works) · links/graph paused pending design review (counterpart pairs still work) · language on.
+- `allCards` (`state.tsx`) reads the whole `cards` table, and `🌐 all sets` search writes every result into it — heavy
+  global searching grows that table without bound. Pre-existing; multi-dock just makes it easier to reach.
+- Layout migration: `dockLayoutV` (currently 2) stamps the `dockLayout` setting. A v0.9.7 layout is *annotated* with
+  `params` in place — no panel is added, removed, moved or resized — and the panel component names (`browse` / `detail`
+  / `oracle`) are deliberately unchanged so an older build can still read a newer layout.
 
 ## Legal
 

@@ -44,7 +44,18 @@ const QUERY = `query FetchCard($set: String!, $number: String!, $back: Boolean =
   }
 }`
 
-export async function fetchCommunityTags(set: string, cn: string, oracleId: string, force = false): Promise<CommunityTags | null> {
+// v0.10: several card docks can mount at once (a restored multi-dock layout), so dedupe concurrent requests for the
+// same card — one in-flight GraphQL call per oracleId, everyone else awaits it.
+const inflight = new Map<string, Promise<CommunityTags | null>>()
+export function fetchCommunityTags(set: string, cn: string, oracleId: string, force = false): Promise<CommunityTags | null> {
+  const running = inflight.get(oracleId)
+  if (running && !force) return running
+  const p = fetchCommunityTagsOnce(set, cn, oracleId, force).finally(() => { if (inflight.get(oracleId) === p) inflight.delete(oracleId) })
+  inflight.set(oracleId, p)
+  return p
+}
+
+async function fetchCommunityTagsOnce(set: string, cn: string, oracleId: string, force = false): Promise<CommunityTags | null> {
   const cached = await db.communityTags.get(oracleId)
   if (cached && !force && Date.now() - cached.fetchedAt < TTL) return cached
   try {

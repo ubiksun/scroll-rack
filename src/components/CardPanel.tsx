@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { db, upsertRating, addTag, removeTag, addEdge as dbAddEdge, tagEdge, type ArtMode, type ArtPref, type Card, type CardTag, type CommunityRow, type CommunityTagsRow, type Context, type Edge, type Rating, type Scheme } from '../db'
 import { pct } from '../api/seventeen'
 import { FEATURES } from '../features'
@@ -10,6 +10,7 @@ export const PANEL_SECTIONS = ['image', 'contexts', 'tags', 'links', 'oracle', '
 export type SectionId = typeof PANEL_SECTIONS[number]
 
 interface Props {
+  domId: string                       // this dock's panel id — prefixes every DOM id (N CardPanels can be mounted)
   card: Card
   contexts: Context[]
   schemes: Scheme[]
@@ -27,9 +28,11 @@ interface Props {
   artMode: ArtMode
   onSetArt: (printingId: string | null) => void
   sections: SectionId[]
-  onMoveSection: (id: SectionId, dir: -1 | 1) => void
+  onReorderSection: (id: SectionId, toIndex: number) => void
   collapsed: Set<string>              // collapsed block ids (context ids, 'links', 'oracle', 'tags')
   onToggleCollapse: (id: string) => void
+  heights: Record<string, number>     // per-section height in px — the user drags the section's bottom-right corner
+  onResizeSection: (id: string, px: number | null) => void
   hideImage?: boolean                 // Card view: the big image is on the left already
   communityTags?: CommunityTagsRow | null   // Scryfall Tagger (experimental); undefined = feature off
   onRefreshCommunity?: () => void
@@ -38,7 +41,7 @@ interface Props {
 }
 
 
-function ContextBlock({ card, ctx, scheme, rating, open, onToggle, onMove, first, last }: { card: Card; ctx: Context; scheme: Scheme | undefined; rating: Rating | undefined; open: boolean; onToggle: () => void; onMove: (dir: -1 | 1) => void; first: boolean; last: boolean }) {
+function ContextBlock({ uid, card, ctx, scheme, rating, open, onToggle, onDropCtx, dropSide, onDragCtx, onOverCtx }: { uid: (s: string) => string; card: Card; ctx: Context; scheme: Scheme | undefined; rating: Rating | undefined; open: boolean; onToggle: () => void; onDropCtx: (fromId: string) => void; dropSide: string; onDragCtx: (id: string | null) => void; onOverCtx: (id: string | null) => void }) {
   const [note, setNote] = useState(rating?.note ?? '')
   useEffect(() => { setNote(rating?.note ?? '') }, [card.id, ctx.id])
   useEffect(() => {
@@ -48,13 +51,18 @@ function ContextBlock({ card, ctx, scheme, rating, open, onToggle, onMove, first
   }, [note])
   const tier = scheme?.tiers.find(x => x.name === rating?.tier)
   return (
-    <div className="block">
-      <div className="block-head" onClick={onToggle}>
+    <div className={`block${dropSide}`}
+      onDragOver={e => { e.preventDefault(); onOverCtx(ctx.id) }}
+      onDragLeave={() => onOverCtx(null)}
+      onDrop={e => { e.preventDefault(); e.stopPropagation(); onOverCtx(null); onDragCtx(null); const from = e.dataTransfer.getData('text/context'); if (from && from !== ctx.id) onDropCtx(from) }}>
+      <div className="block-head draggable" draggable onClick={onToggle}
+        onDragStart={e => { e.stopPropagation(); onDragCtx(ctx.id); e.dataTransfer.setData('text/context', ctx.id); e.dataTransfer.effectAllowed = 'move' }}
+        onDragEnd={() => { onDragCtx(null); onOverCtx(null) }}
+        title="click to collapse · drag to reorder">
         <span className="caret">{open ? '▾' : '▸'}</span>
         <b>{ctx.name}</b>
         {tier && <span className="badge-inline" style={{ background: tier.color }}>{tier.name}</span>}
         {!open && rating?.note && <span className="sub ell">{rating.note}</span>}
-        <span className="sec-move" onClick={e => e.stopPropagation()}><button onClick={() => onMove(-1)} disabled={first} title="move up">↑</button><button onClick={() => onMove(1)} disabled={last} title="move down">↓</button></span>
       </div>
       {open && (
         <div className="block-body">
@@ -65,7 +73,7 @@ function ContextBlock({ card, ctx, scheme, rating, open, onToggle, onMove, first
                 style={rating?.tier === x.name ? { background: x.color, borderColor: x.color } : { borderColor: x.color }}>{x.name}</button>
             ))}
           </div>
-          <textarea id={`note-${ctx.id}`} placeholder={`${ctx.name} — ${t('notes')}`} value={note} onChange={e => setNote(e.target.value)} />
+          <textarea id={uid(`note-${ctx.id}`)} placeholder={`${ctx.name} — ${t('notes')}`} value={note} onChange={e => setNote(e.target.value)} />
         </div>
       )}
     </div>
@@ -73,12 +81,17 @@ function ContextBlock({ card, ctx, scheme, rating, open, onToggle, onMove, first
 }
 
 export default function CardPanel(p: Props) {
-  const { card, contexts, schemes, ratings, tags, allTags, allCards, edges, cardsByOracle, community, onJump, onClose, image, artPref, artMode, onSetArt, sections, onMoveSection, collapsed, onToggleCollapse, hideImage, communityTags, onRefreshCommunity, pair, display } = p
+  const { domId, card, contexts, schemes, ratings, tags, allTags, allCards, edges, cardsByOracle, community, onJump, onClose, image, artPref, artMode, onSetArt, sections, onReorderSection, collapsed, onToggleCollapse, heights, onResizeSection, hideImage, communityTags, onRefreshCommunity, pair, display } = p
+  const uid = (s: string) => `${domId}-${s}`
   const [askPair, setAskPair] = useState(false)
   const [q, setQ] = useState('')
   const [tagQ, setTagQ] = useState('')
   const [edgeNote, setEdgeNote] = useState('')
   const [edgeTagQ, setEdgeTagQ] = useState<Record<number, string>>({})
+  const [dragSec, setDragSec] = useState<SectionId | null>(null)      // section being dragged
+  const [overSec, setOverSec] = useState<SectionId | null>(null)      // section it is hovering over
+  const [dragCtx, setDragCtx] = useState<string | null>(null)
+  const [overCtx, setOverCtx] = useState<string | null>(null)
   useEffect(() => { setQ(''); setEdgeNote(''); setTagQ(''); setEdgeTagQ({}) }, [card.id])
   const allEdgeTags = useMemo(() => [...new Set(edges.flatMap(e => e.tags))].sort(), [edges])
 
@@ -97,52 +110,91 @@ export default function CardPanel(p: Props) {
     setQ(''); setEdgeNote('')
   }
 
-  const moveContext = async (i: number, dir: -1 | 1) => {
-    const j = i + dir; if (j < 0 || j >= contexts.length) return
+  // drag a rating dimension onto another → renumber the whole list so the dropped one lands at that position
+  const reorderContext = async (fromId: string, toIndex: number) => {
     const sorted = [...contexts].sort((a, b) => a.order - b.order)
-    const a = sorted[i], b = sorted[j]
-    await db.transaction('rw', db.contexts, async () => { await db.contexts.update(a.id, { order: b.order }); await db.contexts.update(b.id, { order: a.order }) })
+    const from = sorted.findIndex(c => c.id === fromId)
+    if (from < 0 || from === toIndex) return
+    const next = [...sorted]; next.splice(from, 1); next.splice(toIndex, 0, sorted[from])
+    await db.transaction('rw', db.contexts, async () => {
+      for (let i = 0; i < next.length; i++) if (next[i].order !== i) await db.contexts.update(next[i].id, { order: i })
+    })
   }
 
-  const head = (id: SectionId, title: string, collapsible = true) => (
-    <div className="block-head" onClick={collapsible ? () => onToggleCollapse(id) : undefined}>
-      {collapsible && <span className="caret">{collapsed.has(id) ? '▸' : '▾'}</span>}
+  // The title IS the control: click to collapse, drag it to reorder the sections. No ↑/↓ buttons.
+  const head = (id: SectionId, title: string) => (
+    <div className="block-head draggable" draggable onClick={() => onToggleCollapse(id)}
+      onDragStart={e => { setDragSec(id); e.dataTransfer.setData('text/section', id); e.dataTransfer.effectAllowed = 'move' }}
+      onDragEnd={() => { setDragSec(null); setOverSec(null) }}
+      title="click to collapse · drag to reorder">
+      <span className="caret">{collapsed.has(id) ? '▸' : '▾'}</span>
       <b>{title}</b>
-      <span className="sec-move" onClick={e => e.stopPropagation()}><button onClick={() => onMoveSection(id, -1)} title="move up">↑</button><button onClick={() => onMoveSection(id, 1)} title="move down">↓</button></span>
+      <span className="sec-move" onClick={e => e.stopPropagation()}>
+        {heights[id] && <button onClick={() => onResizeSection(id, null)} title="fit to content">⤢</button>}
+      </span>
     </div>
   )
+
+  // Sections are user-resizable. An explicit full-width grip at the bottom rather than the native CSS `resize`
+  // corner: a section taller than the panel puts that corner outside the scroll viewport, where it can never be
+  // grabbed. Drag the grip; ⤢ in the header clears the stored height and goes back to fitting the content.
+  const box = (id: SectionId, children: React.ReactNode) => {
+    const h = heights[id]
+    // live drop indicator: the target shows a line on the side the dragged section will land on
+    const dropSide = dragSec && overSec === id && dragSec !== id
+      ? (sections.indexOf(dragSec) < sections.indexOf(id) ? ' drop-after' : ' drop-before')
+      : ''
+    return (
+      <div className={`section sizable${h ? ' sized' : ''}${dropSide}`} key={id} style={h ? { height: h } : undefined}
+        onDragOver={e => { e.preventDefault(); if (overSec !== id) setOverSec(id) }}
+        onDragLeave={() => setOverSec(cur => (cur === id ? null : cur))}
+        onDrop={e => {
+          e.preventDefault(); setOverSec(null); setDragSec(null)
+          const from = e.dataTransfer.getData('text/section') as SectionId
+          if (from && from !== id) onReorderSection(from, sections.indexOf(id))
+        }}>
+        {children}
+      </div>
+    )
+  }
 
   const render = (id: SectionId) => {
     switch (id) {
       case 'image':
         if (hideImage) return null
-        return (
-          <div className="section" key={id}>
-            <ArtPicker card={card} src={image} className="big" artPref={artPref} artMode={artMode} onSetArt={onSetArt} />
-          </div>
-        )
+        return box(id, (
+          <>
+            {head(id, t('imageSection'))}
+            {!collapsed.has(id) && <ArtPicker card={card} src={image} className="big" artPref={artPref} artMode={artMode} onSetArt={onSetArt} />}
+          </>
+        ))
       case 'contexts':
-        return (
-          <div className="section" key={id}>
-            {head(id, 'Ratings', false)}
-            {contexts.map((ctx, i) => (
-              <ContextBlock key={ctx.id} card={card} ctx={ctx} scheme={schemes.find(s => s.id === ctx.schemeId)} rating={ratings.find(r => r.context === ctx.id)}
+        return box(id, (
+          <>
+            {head(id, t('ratingsSection'))}
+            {!collapsed.has(id) && contexts.map((ctx, i) => (
+              <ContextBlock key={ctx.id} uid={uid} card={card} ctx={ctx} scheme={schemes.find(s => s.id === ctx.schemeId)} rating={ratings.find(r => r.context === ctx.id)}
                 open={!collapsed.has(ctx.id)} onToggle={() => onToggleCollapse(ctx.id)}
-                first={i === 0} last={i === contexts.length - 1} onMove={dir => moveContext(i, dir)} />
+                onDropCtx={from => reorderContext(from, i)}
+                dropSide={dragCtx && overCtx === ctx.id && dragCtx !== ctx.id
+                  ? (contexts.findIndex(x => x.id === dragCtx) < i ? ' drop-after' : ' drop-before') : ''}
+                onDragCtx={setDragCtx} onOverCtx={setOverCtx} />
             ))}
-          </div>
-        )
+          </>
+        ))
       case 'tags':
-        return (
-          <div className="section" key={id}>
+        return box(id, (
+          <>
             {head(id, `${t('tags')} (${tags.length})`)}
             {!collapsed.has(id) && <>
               <div className="chips">
                 {tags.map(x => <span className="chip" key={x.key}>#{x.tag}<span className="x" onClick={() => removeTag(card.oracleId, x.tag)}>✕</span></span>)}
-                <input placeholder={t('addTag')} value={tagQ} onChange={e => setTagQ(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && tagQ.trim()) { void addTag(card.oracleId, tagQ); setTagQ('') } }} />
+                <span className="typeahead">
+                  <input placeholder={t('addTag')} value={tagQ} onChange={e => setTagQ(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && tagQ.trim()) { void addTag(card.oracleId, tagQ); setTagQ('') } }} />
+                  {tagQ && tagSuggestions.length > 0 && <div className="search-results">{tagSuggestions.map(s => <div key={s} onClick={() => { void addTag(card.oracleId, s); setTagQ('') }}>#{s}</div>)}</div>}
+                </span>
               </div>
-              {tagQ && tagSuggestions.length > 0 && <div className="search-results">{tagSuggestions.map(s => <div key={s} onClick={() => { void addTag(card.oracleId, s); setTagQ('') }}>#{s}</div>)}</div>}
               {communityTags !== undefined && (
                 <div className="tagger">
                   <div className="sub row" style={{ gap: 6 }}><span>◈ Scryfall Tagger</span>{communityTags && <span>· {new Date(communityTags.fetchedAt).toLocaleDateString()}</span>}<button onClick={onRefreshCommunity} title="re-fetch">↻</button></div>
@@ -162,12 +214,12 @@ export default function CardPanel(p: Props) {
                 </div>
               )}
             </>}
-          </div>
-        )
+          </>
+        ))
       case 'links':
         if (!FEATURES.links) return null
-        return (
-          <div className="section" key={id}>
+        return box(id, (
+          <>
             {head(id, `${t('links')} (${edges.length})`)}
             {!collapsed.has(id) && <>
               {edges.map(e => {
@@ -184,9 +236,9 @@ export default function CardPanel(p: Props) {
                     </div>
                     <div className="chips small">
                       {e.tags.map(tg => <span className="chip" key={tg}>#{tg}<span className="x" onClick={() => tagEdge(e.id!, tg, true)}>✕</span></span>)}
-                      <input placeholder="+ tag" value={tq} list={`edge-tags-${e.id}`} onChange={ev => setEdgeTagQ(m => ({ ...m, [e.id!]: ev.target.value }))}
+                      <input placeholder="+ tag" value={tq} list={uid(`edge-tags-${e.id}`)} onChange={ev => setEdgeTagQ(m => ({ ...m, [e.id!]: ev.target.value }))}
                         onKeyDown={ev => { if (ev.key === 'Enter' && tq.trim()) { void tagEdge(e.id!, tq); setEdgeTagQ(m => ({ ...m, [e.id!]: '' })) } }} />
-                      <datalist id={`edge-tags-${e.id}`}>{allEdgeTags.filter(x => !e.tags.includes(x)).map(x => <option key={x} value={x} />)}</datalist>
+                      <datalist id={uid(`edge-tags-${e.id}`)}>{allEdgeTags.filter(x => !e.tags.includes(x)).map(x => <option key={x} value={x} />)}</datalist>
                     </div>
                   </div>
                 )
@@ -194,25 +246,27 @@ export default function CardPanel(p: Props) {
               <div className="row" style={{ marginTop: 6 }}>
                 <input placeholder={t('why')} value={edgeNote} onChange={e => setEdgeNote(e.target.value)} style={{ flex: 1 }} />
               </div>
-              <input placeholder={t('linkTo')} value={q} onChange={e => setQ(e.target.value)} style={{ width: '100%', marginTop: 6 }} />
-              {results.length > 0 && <div className="search-results">{results.map(c => <div key={c.id} onClick={() => addEdge(c)}>{c.name} <span className="sub">({c.set.toUpperCase()})</span></div>)}</div>}
+              <span className="typeahead block">
+                <input placeholder={t('linkTo')} value={q} onChange={e => setQ(e.target.value)} style={{ width: '100%', marginTop: 6 }} />
+                {results.length > 0 && <div className="search-results">{results.map(c => <div key={c.id} onClick={() => addEdge(c)}>{c.name} <span className="sub">({c.set.toUpperCase()})</span></div>)}</div>}
+              </span>
             </>}
-          </div>
-        )
+          </>
+        ))
       case 'oracle':
-        return (
-          <div className="section" key={id}>
+        return box(id, (
+          <>
             {head(id, t('oracle'))}
             {!collapsed.has(id) && <>
               <div className="oracle">{card.oracleText}</div>
               {card.keywords.length > 0 && <div className="sub" style={{ marginTop: 6 }}>{t('keywords')}: {card.keywords.join(', ')}</div>}
             </>}
-          </div>
-        )
+          </>
+        ))
       case 'community':
         if (!FEATURES.community) return null
-        return (
-          <div className="section" key={id}>
+        return box(id, (
+          <>
             {head(id, t('communityTitle'))}
             {!collapsed.has(id) && <>
               <div className="row"><button onClick={community?.onRefresh}>↻ refresh 17lands</button>{community?.fetchedAt && <span className="sub">snapshot {new Date(community.fetchedAt).toLocaleDateString()}</span>}</div>
@@ -227,8 +281,8 @@ export default function CardPanel(p: Props) {
                 </div>
               )}
             </>}
-          </div>
-        )
+          </>
+        ))
     }
   }
 
@@ -257,7 +311,32 @@ export default function CardPanel(p: Props) {
           )}
         </div>
       )}
-      {sections.map(render)}
+      {(() => {
+        const shown = sections.map(id => ({ id, node: render(id) })).filter(x => x.node)
+        const grab = (id: SectionId) => (e: React.PointerEvent<HTMLDivElement>) => {
+          e.preventDefault()
+          const sec = e.currentTarget.previousElementSibling as HTMLElement | null
+          if (!sec) return
+          const startY = e.clientY
+          const startH = sec.getBoundingClientRect().height
+          // pin the height and clip straight away, or the content just overflows and the drag looks like it lags
+          sec.style.height = `${Math.round(startH)}px`
+          sec.classList.add('sized', 'resizing')
+          const move = (ev: PointerEvent) => { sec.style.height = `${Math.max(64, Math.round(startH + ev.clientY - startY))}px` }
+          const up = () => {
+            document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up)
+            sec.classList.remove('resizing')
+            onResizeSection(id, Math.round(sec.getBoundingClientRect().height))
+          }
+          document.addEventListener('pointermove', move); document.addEventListener('pointerup', up)
+        }
+        return shown.map((x, i) => (
+          <Fragment key={x.id}>
+            {x.node}
+            {i < shown.length - 1 && <div className="sec-divider" onPointerDown={grab(x.id)} title="drag to resize the section above" />}
+          </Fragment>
+        ))
+      })()}
     </div>
   )
 }

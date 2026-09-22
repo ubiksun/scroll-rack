@@ -41,7 +41,7 @@ Repo: https://github.com/ubiksun/scroll-rack (public; created 2026-09-21 via `gi
 ## Store listing text (paste)
 
 **Summary** (≤132 chars, same as manifest):
-A Scryfall companion for serious Magic players: your own tier ratings, tags and notes on every card, kept locally.
+Scroll Rack is a browser extension for rating and annotating Magic: The Gathering cards.
 
 **Description:**
 
@@ -92,3 +92,7 @@ Lets Magic: The Gathering players rate cards on their own tier scales and keep n
 **Data usage** — tick **none** of the data types. Certify all three statements (no sale, no use unrelated to single purpose, no creditworthiness use).
 
 **Privacy policy URL**: https://github.com/ubiksun/scroll-rack/blob/main/PRIVACY.md (or the GitHub Pages copy once the repo is public).
+
+## Live listing
+
+https://chromewebstore.google.com/detail/scroll-rack/oejlhhgcahmkcocomlkocjccnandkmdp (Public, verified 2026-09-22)

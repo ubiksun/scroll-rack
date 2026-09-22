@@ -19,6 +19,7 @@ export interface OverlayCard {
   contexts: Context[]
   schemes: Scheme[]
   activeContext: string
+  features: { community: boolean; links: boolean }   // mirrors src/features.ts — the overlay hides what the app hides
 }
 export interface OverlayMissing { found: false; set: string; setLoaded: boolean }
 export type OverlayLookup = OverlayCard | OverlayMissing

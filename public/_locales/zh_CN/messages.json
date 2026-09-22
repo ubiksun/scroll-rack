@@ -1,5 +1,11 @@
 {
-  "extName": { "message": "Scroll Rack" },
-  "extDesc": { "message": "为认真打牌的万智牌玩家做的 Scryfall 伴侣：给每张卡打上你自己的档位、标签和笔记，数据只存在本地。" },
-  "actionTitle": { "message": "打开 Scroll Rack" }
+  "extName": {
+    "message": "Scroll Rack"
+  },
+  "extDesc": {
+    "message": "Scroll rack是一款用于对万智牌进行评分和注释的浏览器扩展程序"
+  },
+  "actionTitle": {
+    "message": "打开 Scroll Rack"
+  }
 }

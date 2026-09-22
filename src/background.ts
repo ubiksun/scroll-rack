@@ -1,5 +1,6 @@
 // MV3 service worker. Owns the extension-origin IndexedDB on behalf of the scryfall.com content script
 // (content scripts live in the page's origin, so they can't open our DB directly — they message us).
+import { FEATURES } from './features'
 import { db, ensureDefaults, upsertRating, addTag, removeTag, getBadgePrefs, applyBadgePrefs, type Card } from './db'
 import { fetchSet } from './api/scryfall'
 import { fetchCommunityTags } from './api/tagger'
@@ -55,6 +56,7 @@ async function lookup(set: string, collectorNumber: string): Promise<OverlayLook
     links: edges.map(e => ({ tags: e.tags ?? [], source: e.source, name: nameOf.get(e.a === card.oracleId ? e.b : e.a) ?? '?', note: e.note })),
     community: snap && row ? { gih: row.ever_drawn_win_rate, oh: row.opening_hand_win_rate, iwd: row.drawn_improvement_win_rate, alsa: row.avg_seen, ata: row.avg_pick, games: row.game_count, percentile: pct, fetchedAt: snap.fetchedAt } : null,
     contexts, schemes, activeContext,
+    features: { community: FEATURES.community, links: FEATURES.links },
   }
 }
 

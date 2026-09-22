@@ -1,5 +1,11 @@
 {
-  "extName": { "message": "Scroll Rack" },
-  "extDesc": { "message": "為認真打牌的魔法風雲會玩家做的 Scryfall 伴侶：給每張卡打上你自己的檔位、標籤和筆記，資料只存在本地。" },
-  "actionTitle": { "message": "開啟 Scroll Rack" }
+  "extName": {
+    "message": "Scroll Rack"
+  },
+  "extDesc": {
+    "message": "Scroll Rack 是一款用於對萬智牌進行評分和註釋的瀏覽器擴充功能"
+  },
+  "actionTitle": {
+    "message": "開啟 Scroll Rack"
+  }
 }

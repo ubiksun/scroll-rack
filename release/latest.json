@@ -1,6 +1,6 @@
 {
-  "version": "0.9.7",
-  "zip": "https://github.com/ubiksun/scroll-rack/releases/download/v0.9.7/scroll-rack-v0.9.7.zip",
-  "notes": "Final icon artwork",
-  "date": "2026-09-21"
+  "version": "0.10.0",
+  "zip": "https://github.com/ubiksun/scroll-rack/releases/download/v0.10.0/scroll-rack-v0.10.0.zip",
+  "notes": "Multi-dock workspace: several search panels each with its own query, several card panels at once, rebuilt Options, sharper card images",
+  "date": "2026-09-22"
 }

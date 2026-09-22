@@ -5,6 +5,13 @@ import { importBundle, getSetting, setSetting } from './db'
 import { exportCsv, exportDecklist, exportGraph, exportJson, exportMarkdown } from './export'
 import { t } from './i18n'
 import { GraderProvider, useGrader } from './state'
+import { ScopeProvider } from './scope'
+import { DEFAULT_QUERY, TIER_SEP, type SerializedQuery, type SortRule } from './query'
+import {
+  COMPONENT, LAYOUT_VERSION, addBrowseDock, asBrowse, asCard, asOracle, closeCompanions, isBrowsePanel, isCardPanel,
+  migrateLayout, nextPanelId, openCard, resolveOrphans, type OracleMode,
+} from './docks'
+import DockTab from './components/DockTab'
 import SetPicker from './components/SetPicker'
 import OptionsModal from './components/OptionsModal'
 import BrowsePanel from './panels/BrowsePanel'
@@ -13,24 +20,24 @@ import DetailPanel from './panels/DetailPanel'
 import OraclePanel from './panels/OraclePanel'
 import { checkForUpdate, currentVersion, type LatestInfo } from './update'
 import { FEATURES } from './features'
+import { useDockKeyboard } from './hooks/useDockKeyboard'
 
 // Docking layout (VS Code-style): every panel is a tab you can drag, split, stack or float. Layout persists.
-const PANELS: Record<string, { title: string; component: string }> = {
-  browse: { title: 'Browse', component: 'browse' },
-  ...(FEATURES.links ? { graph: { title: 'Graph', component: 'graph' } } : {}),
-  detail: { title: 'Card', component: 'detail' },
-  oracle: { title: 'Oracle', component: 'oracle' },
-}
+// v0.10: Browse and Card docks are multi-instance — each describes itself through `params` (see src/docks.ts).
+// There are no "reopen panel X" buttons: + Search / + Card mint fresh docks, and Oracle comes from a card panel's ⧉.
 const components: Record<string, React.FunctionComponent<IDockviewPanelProps>> = {
-  browse: () => <BrowsePanel />, graph: () => <GraphPanel />, detail: () => <DetailPanel />, oracle: () => <OraclePanel />,
+  browse: p => <ScopeProvider api={p.api} containerApi={p.containerApi} params={asBrowse(p.params)}><BrowsePanel /></ScopeProvider>,
+  graph: p => <ScopeProvider api={p.api} containerApi={p.containerApi} params={asBrowse(p.params)}><GraphPanel /></ScopeProvider>,
+  detail: p => <DetailPanel api={p.api} containerApi={p.containerApi} params={asCard(p.params)} />,
+  oracle: p => <OraclePanel api={p.api} containerApi={p.containerApi} params={asOracle(p.params)} />,
 }
 
-function defaultLayout(api: DockviewApi) {
+function defaultLayout(api: DockviewApi, seed: SerializedQuery, oracleMode: OracleMode) {
   api.clear()
-  api.addPanel({ id: 'browse', component: 'browse', title: 'Browse' })
-  if (FEATURES.links) api.addPanel({ id: 'graph', component: 'graph', title: 'Graph', position: { referencePanel: 'browse', direction: 'within' } })
-  api.addPanel({ id: 'detail', component: 'detail', title: 'Card', position: { referencePanel: 'browse', direction: 'right' }, initialWidth: 380 })
-  api.addPanel({ id: 'oracle', component: 'oracle', title: 'Oracle', position: { referencePanel: 'detail', direction: 'below' }, initialHeight: 220 })
+  api.addPanel({ id: 'browse', component: COMPONENT.browse, title: 'Browse', params: { kind: 'browse', scopeId: 'main', q: seed, sel: null } })
+  if (FEATURES.links) api.addPanel({ id: 'graph', component: COMPONENT.graph, title: 'Graph', params: { kind: 'browse', scopeId: 'main', q: seed, sel: null }, position: { referencePanel: 'browse', direction: 'within' } })
+  api.addPanel({ id: 'detail', component: COMPONENT.card, title: 'Card', params: { kind: 'card', scopeId: 'main', primary: true }, position: { referencePanel: 'browse', direction: 'right' }, initialWidth: 380 })
+  api.addPanel({ id: 'oracle', component: COMPONENT.oracle, title: 'Oracle', params: { kind: 'oracle', ownerId: oracleMode === 'attached' ? 'detail' : null }, position: { referencePanel: 'detail', direction: 'below' }, initialHeight: 220 })
   api.getPanel('browse')?.api.setActive()
 }
 
@@ -41,24 +48,49 @@ function Shell() {
   const apiRef = useRef<DockviewApi | null>(null)
   const [latest, setLatest] = useState<LatestInfo | null>(null)
   useEffect(() => { void checkForUpdate().then(setLatest) }, [])
+  useDockKeyboard(apiRef)
 
   const onReady = async (e: DockviewReadyEvent) => {
     apiRef.current = e.api
     const saved = await getSetting<object | null>('dockLayout', null)
-    try { if (saved) e.api.fromJSON(saved as never); else defaultLayout(e.api) } catch { defaultLayout(e.api) }
+    const ver = await getSetting<number>('dockLayoutV', 1)
+    const oracleMode = await getSetting<OracleMode>('oracleMode', 'shared')
+    // v0.9.7 persisted one global sort + search scope; they seed the 'main' scope and every newly opened dock.
+    const seed: SerializedQuery = {
+      ...DEFAULT_QUERY,
+      sorts: await getSetting<SortRule[]>('sorts', [{ key: 'number', dir: 'asc' }]),
+      searchScope: await getSetting<'active' | 'all'>('searchScope', 'active'),
+    }
+    try { if (saved) e.api.fromJSON((ver < LAYOUT_VERSION ? migrateLayout(saved, seed, oracleMode) : saved) as never); else defaultLayout(e.api, seed, oracleMode) }
+    catch { defaultLayout(e.api, seed, oracleMode) }
     if (!FEATURES.links) e.api.getPanel('graph')?.api.close()
-    if (e.api.panels.length === 0) defaultLayout(e.api)
+    if (e.api.panels.length === 0) defaultLayout(e.api, seed, oracleMode)
+    resolveOrphans(e.api)
+    if (saved && ver < LAYOUT_VERSION) g.setStatus(t('searchMovedHint'))
+    void setSetting('dockLayoutV', LAYOUT_VERSION)
+    // focus-follows-last-touched, per kind: a Card dock never steals the arrow keys from a Browse dock
+    e.api.onDidActivePanelChange(ev => {
+      const p = ev.panel
+      if (!p) return
+      if (isBrowsePanel(p)) g.setActiveScope(asBrowse(p.params).scopeId)
+      else if (isCardPanel(p)) g.setActiveCardPanel(p.id)
+    })
+    e.api.onDidRemovePanel(p => { if (isCardPanel(p)) closeCompanions(e.api, p.id) })
     let h: number | undefined
     e.api.onDidLayoutChange(() => { clearTimeout(h); h = window.setTimeout(() => void setSetting('dockLayout', e.api.toJSON()), 300) })
   }
-  const showPanel = (id: string) => {
+  const newSearch = () => { const api = apiRef.current; if (api) addBrowseDock(api) }
+  const newCard = () => {
     const api = apiRef.current; if (!api) return
-    const p = api.getPanel(id)
-    if (p) { p.api.setActive(); return }
-    const ref = api.panels[0]
-    api.addPanel({ id, component: PANELS[id].component, title: PANELS[id].title, position: ref ? { referencePanel: ref.id, direction: id === 'detail' || id === 'oracle' ? 'right' : 'within' } : undefined })
+    const c = g.navOf(g.activeScopeId)?.selected
+    if (c) openCard(api, c, { mode: 'new', scopeId: g.activeScopeId, title: g.nameOf(c), oracleMode: g.oracleMode, place: 'within' })
+    else api.addPanel({ id: nextPanelId(api, 'card'), component: COMPONENT.card, title: 'Card', params: { kind: 'card' } })
   }
-  const resetLayout = () => { const api = apiRef.current; if (api) { defaultLayout(api); void setSetting('dockLayout', api.toJSON()) } }
+  const resetLayout = async () => {
+    const api = apiRef.current; if (!api) return
+    defaultLayout(api, DEFAULT_QUERY, g.oracleMode)
+    void setSetting('dockLayout', api.toJSON())
+  }
 
   useEffect(() => {
     if (!exportOpen) return
@@ -69,19 +101,21 @@ function Shell() {
   if (!g.ready) return null
   const communityForCsv = () => new Map(g.cards.map(c => [c.name, { gih: g.communityRows.get(c.name)?.ever_drawn_win_rate ?? null, pct: g.percentiles.get(c.name) }]))
   const doImport = async (f: File | undefined) => { if (!f) return; try { await importBundle(JSON.parse(await f.text())); g.setStatus(`Imported ${f.name}`) } catch (e) { g.setStatus(String(e)) } }
+  // the decklist export follows the focused search dock — that's the list you are looking at
+  const exportCurrentList = () => {
+    const r = g.navOf(g.activeScopeId)
+    const sets = g.activeSets.map(s => s.toUpperCase()).join('+')
+    exportDecklist(r?.filtered ?? [], `${sets}${r?.tierF ? '_' + r.tierF.replace(TIER_SEP, '-') : ''}`)
+  }
 
   return (
     <div className="app dock">
       <div className="topbar">
         <SetPicker local={g.localSets} active={g.activeSets} onToggle={g.toggleSet} onPull={g.pullSet} onPullMany={g.pullMany} busy={g.busySet} />
         <div className="group">
-          {Object.entries(PANELS).map(([id, p]) => <button key={id} onClick={() => showPanel(id)} title={`show ${p.title} panel`}>{p.title}</button>)}
+          <button onClick={newSearch} title="Open another search panel with its own query">{t('newSearch')}</button>
+          <button onClick={newCard} title={t('newCardDock')}>{t('newCard')}</button>
           <button onClick={resetLayout} title="Reset panel layout">⟲ layout</button>
-        </div>
-        <div className="group search-group">
-          <input placeholder={g.searchScope === 'all' ? 'Search all of Scryfall (Scryfall syntax) …' : t('search')} value={g.textF} onChange={e => g.setTextF(e.target.value)} className={`search${g.searchState === 'error' ? ' err' : ''}`} />
-          <button className={g.searchScope === 'all' ? 'active' : ''} onClick={() => g.setSearchScope(g.searchScope === 'all' ? 'active' : 'all')} title={g.searchScope === 'all' ? 'Searching every set on Scryfall (results are cached as you open them). Click to search only the active sets.' : 'Searching the active sets only. Click to search all of Scryfall.'}>{g.searchScope === 'all' ? '🌐 all sets' : '▣ active sets'}</button>
-          <span className="status">{g.searchState === 'busy' ? t('searching') : g.searchState === 'error' ? t('syntaxError') : g.searchState === 'local' ? t('localSearch') : ''}</span>
         </div>
         <span className="spacer" />
         <div className="group">
@@ -92,7 +126,7 @@ function Shell() {
                 <div onClick={exportJson}>{t('exportJson')}</div>
                 {g.activeSets.map(code => g.contexts.map(ctx => <div key={code + ctx.id} onClick={() => exportCsv(code, ctx, communityForCsv())}>CSV — {code.toUpperCase()} · {ctx.name}</div>))}
                 {g.activeSets.map(code => <div key={code} onClick={() => exportMarkdown(code, g.contexts, g.schemes)}>Markdown / Obsidian — {code.toUpperCase()}</div>)}
-                <div onClick={() => exportDecklist(g.filtered, `${g.activeSets.map(s => s.toUpperCase()).join('+')}${g.tierF ? '_' + g.tierF.replace('\u0000', '-') : ''}`)}>{t('exportList')}</div>
+                <div onClick={exportCurrentList}>{t('exportList')}</div>
                 {FEATURES.links && <div onClick={exportGraph}>{t('exportGraph')}</div>}
               </div>
             )}
@@ -103,7 +137,7 @@ function Shell() {
       </div>
 
       <div className="dock-host">
-        <DockviewReact components={components} onReady={onReady} theme={themeLight} />
+        <DockviewReact components={components} defaultTabComponent={DockTab} onReady={onReady} theme={themeLight} />
       </div>
 
       {latest && (

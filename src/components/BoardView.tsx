@@ -6,14 +6,16 @@ interface Props {
   contexts: Context[]
   schemes: Scheme[]
   ratingOf: (c: Card, ctx: string) => Rating | undefined
-  imageOf: (c: Card) => string
+  imageOf: (c: Card, size?: 'small' | 'normal' | 'large') => string
   selectedId: string | null
-  onSelect: (c: Card) => void
+  onSelect: (c: Card, e: React.MouseEvent) => void
 }
 
 // Tier board: one zone per tier + an Unrated pool. Drag a card onto a zone to rate it. Cards inside a zone sit in an
 // overlapping stack (snap = the flex layout); hovering a stack fans it out. Context tabs pick which rating you're setting.
 export default function BoardView({ cards, contexts, schemes, ratingOf, imageOf, selectedId, onSelect }: Props) {
+  // the stack renders each card at 100px, which needs 200 real pixels on a HiDPI screen — more than `small` has
+  const stackSize = (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1) > 1 ? 'normal' : 'small'
   const [ctxId, setCtxId] = useState(contexts[0]?.id ?? 'limited')
   const [over, setOver] = useState<string | null>(null)
   const ctx = contexts.find(c => c.id === ctxId) ?? contexts[0]
@@ -48,10 +50,10 @@ export default function BoardView({ cards, contexts, schemes, ratingOf, imageOf,
           <div className="zone-label" style={{ background: z.color }}>{z.label}<span className="sub"> {z.cards.length}</span></div>
           <div className="stack">
             {z.cards.map(c => (
-              <img key={c.id} src={imageOf(c)} alt={c.name} title={c.name} draggable
+              <img key={c.id} src={imageOf(c, stackSize)} alt={c.name} title={c.name} draggable
                 className={c.id === selectedId ? 'sel' : ''}
                 onDragStart={e => { e.dataTransfer.setData('text/card', c.id); e.dataTransfer.effectAllowed = 'move' }}
-                onClick={() => onSelect(c)} />
+                onClick={e => onSelect(c, e)} />
             ))}
           </div>
         </div>

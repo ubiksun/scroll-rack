@@ -1,4 +1,9 @@
-# Scroll Rack v0.9.7 — 測試版安裝說明 / Tester Install Guide
+# Scroll Rack v0.10.0 — 測試版安裝說明 / Tester Install Guide
+
+**Chrome Web Store: https://chromewebstore.google.com/detail/scroll-rack/oejlhhgcahmkcocomlkocjccnandkmdp**
+
+The steps below are only needed for side-loading a build that is not on the store yet.
+
 
 > 未上架 Chrome Web Store 的內測版。用「載入未封裝」方式安裝,不需要 Node、不需要 build。
 > Pre-release build, not on the Web Store. Installs as an unpacked extension; no Node or build step needed.
@@ -11,7 +16,7 @@ A personal card-knowledge layer for MTG: rate every card per context (Limited / 
 
 ## 安裝 / Install
 
-1. 解壓 `scroll-rack-v0.9.7.zip` 到一個**不會刪掉**的位置(Chrome 之後一直從這裡讀)。
+1. 解壓 `scroll-rack-v0.10.0.zip` 到一個**不會刪掉**的位置(Chrome 之後一直從這裡讀)。
    Unzip to a folder you'll keep — Chrome loads the extension from it every time.
 2. Chrome 網址欄輸入 `chrome://extensions`
 3. 右上角開 **開發人員模式 / Developer mode**

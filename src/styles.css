@@ -28,7 +28,7 @@ a { color: var(--accent); }
 .content { overflow: auto; padding: 12px; }
 .panel { border-left: 1px solid var(--border); background: var(--panel); overflow: auto; padding: 12px; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--card-min, 150px), 1fr)); gap: 10px; }
 .card { position: relative; border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; background: #E0DEE3; }
 .card img { display: block; width: 100%; aspect-ratio: 488/680; object-fit: cover; }
 .card.selected { border-color: var(--accent); }
@@ -253,3 +253,131 @@ button.gear svg { width: 22px; height: 22px; }
 .modal.wide { width: 720px; max-width: 95vw; }
 
 .seg { display: inline-flex; } .seg button { border-radius: 0; } .seg button:first-child { border-radius: 6px 0 0 6px; } .seg button:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+
+/* ---- v0.10 multi-dock ---- */
+/* every search dock carries its own search box + filters, so the sub-bar has to wrap instead of clipping */
+.pane .sub-bar { flex-wrap: wrap; row-gap: 4px; }
+.pane .sub-bar .search-group { flex: 1 1 220px; min-width: 160px; }
+.pane .sub-bar .search { flex: 1 1 140px; min-width: 100px; }
+.panel .dock-actions { float: right; display: flex; gap: 4px; margin-left: 8px; }
+.panel .dock-actions button { padding: 1px 6px; }
+
+/* Sashes: dockview ships a 4px sash whose enlarged hit area is gated behind @media (pointer: coarse), and whose
+   colour defaults to transparent — with a mouse it is neither findable nor visible. Give it a ±6px grab zone and a
+   real hover cue so stacked docks can actually be resized. */
+.dv-dockview { --dv-active-sash-color: var(--accent); --dv-active-sash-transition-delay: 0s; }
+.dv-split-view-container > .dv-sash-container > .dv-sash:not(.dv-disabled)::before {
+  content: ""; position: absolute; background: transparent;
+}
+.dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:not(.dv-disabled) { cursor: col-resize; }
+.dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash:not(.dv-disabled)::before { top: 0; bottom: 0; left: -6px; right: -6px; }
+.dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash:not(.dv-disabled) { cursor: row-resize; }
+.dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash:not(.dv-disabled)::before { left: 0; right: 0; top: -6px; bottom: -6px; }
+
+/* Typeahead lists (add tag · link to card) open UPWARD, floating over the content above the input: in a scrolled
+   panel a list that grows downwards pushes itself off-screen and you have to scroll again to read it. */
+.typeahead { position: relative; display: inline-flex; }
+.typeahead.block { display: block; }
+.typeahead .search-results {
+  position: absolute; bottom: 100%; left: 0; min-width: 100%; width: max-content; max-width: 260px;
+  margin: 0 0 4px; z-index: 30; background: var(--panel); box-shadow: 0 -6px 18px rgba(0,0,0,.18);
+}
+.typeahead.block .search-results { max-width: none; right: 0; }
+
+/* ---- v0.10.1 sizing ----
+   The single-card image was constrained on ONE axis only (max-height, no max-width), so in a wide dock it refused to
+   grow into the available height and left a big empty band beside it, and in a narrow dock it overflowed instead of
+   shrinking. Fit it to the box on both axes and let it claim the leftover height. */
+.single { justify-content: flex-start; }
+.single > .artwrap, .single .pair-view { flex: 1 1 auto; min-height: 0; max-width: 100%; }
+.single > .artwrap { display: flex; justify-content: center; }
+.single-img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+
+/* Card-panel sections are individually resizable (drag the corner). Heights persist per section. */
+/* overflow stays VISIBLE until the user actually pins a height — otherwise the upward-opening typeahead and the
+   art-picker popover would be clipped by their own section. */
+.dock-host .panel .section.sizable { position: relative; overflow: visible; min-height: 64px; }
+.dock-host .panel .section.sized { overflow: auto; }
+/* The divider between two sections is a real element: it draws the rule you see AND is the thing you grab, so the
+   two can never end up in different places (they did, when the rule was a border and the grab zone was absolutely
+   positioned inside a section that content could overflow). It resizes the section above it. */
+.sec-divider { position: relative; height: 11px; margin: 0; cursor: row-resize; }
+.sec-divider::after { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 1px; background: var(--border); transition: background .1s, height .1s, top .1s; }
+.sec-divider:hover::after, .sec-divider.on::after { background: var(--accent); height: 2px; top: 4px; }
+.dock-host .panel .section.resizing { overflow: hidden; user-select: none; }
+/* drag the title to reorder */
+.block-head.draggable { cursor: grab; }
+.block-head.draggable:active { cursor: grabbing; }
+.dock-host .panel .section.sized > .artwrap { height: 100%; display: block; }
+.dock-host .panel .section.sized img.big { height: 100%; width: 100%; object-fit: contain; margin-bottom: 0; }
+
+/* Custom dock tab: name + hover-revealed actions, close last. */
+.lg-tab { display: flex; align-items: center; gap: 4px; padding: 0 6px 0 10px; height: 100%; max-width: 240px; }
+.lg-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-tab-input { width: 120px; padding: 0 4px; font: inherit; font-size: 13px; height: 20px; }
+.lg-tab-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .1s; }
+.lg-tab:hover .lg-tab-actions, .dv-active-tab .lg-tab-actions { opacity: 1; }
+.lg-tab-actions button { padding: 0 4px; font-size: 11px; line-height: 18px; border-color: transparent; background: transparent; }
+.lg-tab-actions button:hover { border-color: var(--border); background: var(--panel); }
+.lg-tab-close { opacity: 0; cursor: pointer; padding: 0 3px; color: var(--muted); transition: opacity .1s; }
+.lg-tab:hover .lg-tab-close, .dv-active-tab .lg-tab-close { opacity: 1; }
+.lg-tab-close:hover { color: var(--text); }
+
+/* ---- v0.10.1 Options ---- */
+.modal.options { display: flex; gap: 0; padding: 0; width: min(920px, 94vw); max-height: 86vh; overflow: hidden; }
+.opt-nav { display: flex; flex-direction: column; gap: 2px; width: 186px; flex: none; padding: 14px 10px; background: var(--bg); border-right: 1px solid var(--border); overflow: auto; }
+.opt-nav h2 { margin: 0 4px 10px; font-size: 16px; }
+.opt-nav .spacer { flex: 1; min-height: 12px; }
+.opt-group { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 10px 6px 3px; }
+.opt-nav > div { display: flex; flex-direction: column; gap: 2px; }
+.opt-link { text-align: left; background: transparent; border-color: transparent; padding: 4px 8px; width: 100%; }
+.opt-link:hover { background: var(--panel); border-color: var(--border); }
+.opt-link.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.opt-body { flex: 1; min-width: 0; padding: 16px 18px; overflow: auto; }
+.opt-body section { max-width: 620px; }
+.opt-body h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.opt-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.opt-row:last-child { border-bottom: 0; }
+.about-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.about-links .icon-link { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border: 1px solid var(--border); border-radius: 8px; color: var(--muted); background: var(--panel); transition: color .1s, border-color .1s; }
+.about-links .icon-link:hover { color: var(--accent); border-color: var(--accent); }
+.about-links .site-icon { border-radius: 4px; display: block; object-fit: cover; }
+.opt-body section.about p { margin: 6px 0; }
+button.linkish { background: transparent; border-color: transparent; color: var(--accent); padding: 0 4px; }
+button.linkish:hover { text-decoration: underline; }
+/* drag-to-reorder rows */
+tr.draggable, .tier-edit.draggable { cursor: grab; }
+tr.draggable.dragging, .tier-edit.dragging { opacity: .4; }
+.tier-edit .grip { color: var(--muted); cursor: grab; user-select: none; }
+/* badge design: live preview beside the controls */
+.badge-design { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+.badge-preview { flex: 0 0 240px; position: sticky; top: 0; }
+.preview-card { position: relative; margin-top: 6px; }
+.preview-card img { width: 100%; border-radius: 10px; display: block; }
+/* the badge stacks are positioned by `.card .badges` — the preview is not a .card, so repeat the anchoring here */
+.preview-card .badges { position: absolute; display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
+.preview-card .badges.pos-tl { top: 8px; left: 8px; }
+.preview-card .badges.pos-tr { top: 8px; right: 8px; align-items: flex-end; }
+.preview-card .badges.pos-bl { bottom: 8px; left: 8px; flex-direction: column-reverse; }
+.preview-card .badges.pos-br { bottom: 8px; right: 8px; flex-direction: column-reverse; align-items: flex-end; }
+.preview-card .badge { padding: 2px 8px; border-radius: 12px; font-weight: 700; font-size: 12px; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.4); }
+.badge-controls { flex: 1 1 280px; min-width: 260px; display: flex; flex-direction: column; gap: 8px; }
+.badge-controls .block-body { display: flex; flex-direction: column; gap: 6px; }
+.badge-controls label { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+
+/* ---- v0.10.1 grid zoom + section divider alignment ---- */
+.pane .sub-bar .zoom { align-items: center; gap: 4px; }
+.pane .sub-bar .zoom input[type=range] { width: 88px; accent-color: var(--accent); }
+
+/* The divider used to be the NEXT section's border-top, sitting 14px of margin below the section it belongs to —
+   so the resize line and the line you can see were in different places. Own the border, drop the margin. */
+.dock-host .panel .section.sizable { margin-top: 0; padding-top: 8px; padding-bottom: 8px; border-top: 0; border-bottom: 0; }
+
+/* Live drop indicator while reordering: a line on the side the dragged row will land on. */
+.drop-before { box-shadow: inset 0 2px 0 0 var(--accent); }
+.drop-after { box-shadow: inset 0 -2px 0 0 var(--accent); }
+tr.drop-before > td { box-shadow: inset 0 2px 0 0 var(--accent); }
+tr.drop-after > td { box-shadow: inset 0 -2px 0 0 var(--accent); }
+.lg-tab-actions button.on { opacity: 1; border-color: var(--accent); background: var(--accent-soft); }
+.lg-tab.pinned .lg-tab-actions { opacity: 1; }

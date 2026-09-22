@@ -8,14 +8,21 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
   const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e
 }
 
-type SectionId = 'rate' | 'note' | 'tags' | 'links' | 'community'
-const ALL_SECTIONS: SectionId[] = ['rate', 'note', 'tags', 'links', 'community']
-interface OverlayPrefs { x: number; y: number; collapsed: boolean; sections: SectionId[] }
-const DEFAULT_PREFS: OverlayPrefs = { x: Math.max(16, window.innerWidth - 324), y: 72, collapsed: false, sections: ALL_SECTIONS }   // right edge, under Scryfall's header
+// 'note' used to be its own section showing ONE context's note. It now lives inside each context's own block in
+// 'rate', so every rating dimension has its own notes — same shape as the app's card panel.
+type SectionId = 'rate' | 'tags' | 'links' | 'community'
+const ALL_SECTIONS: SectionId[] = ['rate', 'tags', 'links', 'community']
+const SECTION_TITLE: Record<SectionId, string> = { rate: 'Ratings', tags: 'Tags', links: 'Links', community: '17lands' }
+interface OverlayPrefs { x: number; y: number; collapsed: boolean; sections: SectionId[]; closed: string[] }
+const DEFAULT_PREFS: OverlayPrefs = { x: Math.max(16, window.innerWidth - 324), y: 72, collapsed: false, sections: ALL_SECTIONS, closed: [] }   // right edge, under Scryfall's header
 
 async function loadPrefs(): Promise<OverlayPrefs> {
   const r = await chrome.storage.local.get('overlayPrefs')
-  return { ...DEFAULT_PREFS, ...(r.overlayPrefs ?? {}) }
+  const p = { ...DEFAULT_PREFS, ...(r.overlayPrefs ?? {}) }
+  p.sections = (p.sections ?? ALL_SECTIONS).filter((s: string) => (ALL_SECTIONS as string[]).includes(s)) as SectionId[]
+  if (!p.sections.length) p.sections = [...ALL_SECTIONS]
+  p.closed = p.closed ?? []
+  return p
 }
 const savePrefs = (p: OverlayPrefs) => chrome.storage.local.set({ overlayPrefs: p })
 
@@ -59,16 +66,17 @@ async function renderCardPanel() {
 
   // section chooser (modular: toggle + reorder)
   const chooser = el('div', 'lg-chooser'); chooser.hidden = true
+  const available = ALL_SECTIONS.filter(id => id !== 'community' || (data.found && data.features?.community))
   const drawChooser = () => {
     chooser.replaceChildren()
-    for (const id of ALL_SECTIONS) {
+    for (const id of available) {
       const row = el('div', 'lg-chooser-row')
       const cb = el('input') as HTMLInputElement; cb.type = 'checkbox'; cb.checked = prefs.sections.includes(id)
-      cb.onchange = () => { prefs.sections = cb.checked ? ALL_SECTIONS.filter(s => prefs.sections.includes(s) || s === id) : prefs.sections.filter(s => s !== id); void savePrefs(prefs); drawBody() }
+      cb.onchange = () => { prefs.sections = cb.checked ? available.filter(s => prefs.sections.includes(s) || s === id) : prefs.sections.filter(s => s !== id); void savePrefs(prefs); drawBody() }
       const up = el('button', 'lg-btn', '↑'), dn = el('button', 'lg-btn', '↓')
       up.onclick = () => { const i = prefs.sections.indexOf(id); if (i > 0) { [prefs.sections[i - 1], prefs.sections[i]] = [prefs.sections[i], prefs.sections[i - 1]]; void savePrefs(prefs); drawChooser(); drawBody() } }
       dn.onclick = () => { const i = prefs.sections.indexOf(id); if (i >= 0 && i < prefs.sections.length - 1) { [prefs.sections[i + 1], prefs.sections[i]] = [prefs.sections[i], prefs.sections[i + 1]]; void savePrefs(prefs); drawChooser(); drawBody() } }
-      row.append(cb, el('span', '', id), up, dn); chooser.append(row)
+      row.append(cb, el('span', '', SECTION_TITLE[id]), up, dn); chooser.append(row)
     }
   }
   gear.onclick = () => { chooser.hidden = !chooser.hidden; if (!chooser.hidden) drawChooser() }
@@ -85,21 +93,57 @@ async function renderCardPanel() {
       }
       return
     }
-    for (const id of prefs.sections) body.append(section(id, data))
+    for (const id of prefs.sections) { if (available.includes(id)) body.append(section(id, data, prefs)) }
   }
   drawBody()
   document.body.append(panel)
 }
 
-function section(id: SectionId, d: OverlayCard): HTMLElement {
+// Every section gets a collapsible header, and every rating context is itself a collapsible block carrying its own
+// tier row AND its own notes — the panel is tall and lives on top of a card page, so being able to stow what you are
+// not using matters more here than in the app. Collapse state is per section / per context, saved with the prefs.
+function section(id: SectionId, d: OverlayCard, prefs: OverlayPrefs): HTMLElement {
   const wrap = el('div', 'lg-sec')
+  const isClosed = (key: string) => prefs.closed.includes(key)
+  const setClosed = (key: string, closed: boolean) => {
+    prefs.closed = closed ? [...new Set([...prefs.closed, key])] : prefs.closed.filter(k => k !== key)
+    void savePrefs(prefs)
+  }
+  // header + body pair with a caret; `extra` renders a summary that stays visible while collapsed
+  const block = (key: string, title: string, extra?: HTMLElement) => {
+    const head = el('div', 'lg-head-row')
+    const caret = el('span', 'lg-caret', isClosed(key) ? '▸' : '▾')
+    head.append(caret, el('span', 'lg-h', title))
+    if (extra) head.append(extra)
+    const bodyEl = el('div', 'lg-sec-body')
+    bodyEl.hidden = isClosed(key)
+    head.onclick = () => { const next = !bodyEl.hidden; bodyEl.hidden = next; caret.textContent = next ? '▸' : '▾'; setClosed(key, next) }
+    wrap.append(head, bodyEl)
+    return bodyEl
+  }
+
   switch (id) {
     case 'rate': {
+      const body = block('sec:rate', SECTION_TITLE.rate)
       for (const ctx of d.contexts) {
         const scheme = d.schemes.find(s => s.id === ctx.schemeId) ?? d.schemes[0]
         const r = d.ratings.find(x => x.context === ctx.id)
-        const row = el('div', `lg-ctx${ctx.id === d.activeContext ? ' lg-active' : ''}`)
-        row.append(el('span', 'lg-ctx-name', ctx.name))
+        const key = `ctx:${ctx.id}`
+        const ctxWrap = el('div', 'lg-ctx-block')
+        const head = el('div', 'lg-ctx-head')
+        const caret = el('span', 'lg-caret', isClosed(key) ? '▸' : '▾')
+        const badge = el('span', 'lg-ctx-badge')
+        const paintBadge = () => {
+          const tier = scheme?.tiers.find(t => t.name === r?.tier)
+          badge.textContent = tier ? tier.name : ''
+          badge.style.background = tier?.color ?? 'transparent'
+          badge.classList.toggle('lg-on', !!tier)
+        }
+        head.append(caret, el('b', 'lg-ctx-name', ctx.name), badge)
+        const ctxBody = el('div', 'lg-ctx-body')
+        ctxBody.hidden = isClosed(key)
+        head.onclick = () => { const next = !ctxBody.hidden; ctxBody.hidden = next; caret.textContent = next ? '▸' : '▾'; setClosed(key, next) }
+
         const tiers = el('span', 'lg-tiers')
         for (const tier of scheme?.tiers ?? []) {
           const b = el('button', 'lg-tier', tier.name)
@@ -111,25 +155,30 @@ function section(id: SectionId, d: OverlayCard): HTMLElement {
             if (r) r.tier = next; else d.ratings.push({ context: ctx.id, tier: next, note: '' })
             tiers.querySelectorAll<HTMLButtonElement>('.lg-tier').forEach(x => { x.classList.remove('lg-on'); x.style.background = '' })
             if (next) { b.classList.add('lg-on'); b.style.background = tier.color }
+            paintBadge()
             void renderCardImageBadges()
           }
           tiers.append(b)
         }
-        row.append(tiers); wrap.append(row)
+        // one notes box per context — the overlay used to show only the first context's note
+        const ta = el('textarea', 'lg-note') as HTMLTextAreaElement
+        ta.placeholder = `${ctx.name} — notes`
+        ta.value = r?.note ?? ''
+        let h: number | undefined
+        ta.oninput = () => {
+          clearTimeout(h)
+          h = window.setTimeout(() => void send({ type: 'note', set: d.set, oracleId: d.oracleId, context: ctx.id, note: ta.value }), 500)
+          if (r) r.note = ta.value
+        }
+        ctxBody.append(tiers, ta)
+        paintBadge()
+        ctxWrap.append(head, ctxBody)
+        body.append(ctxWrap)
       }
       break
     }
-    case 'note': {
-      const r = d.ratings.find(x => x.context === d.activeContext)
-      const ta = el('textarea', 'lg-note') as HTMLTextAreaElement
-      ta.placeholder = `notes — ${d.contexts.find(c => c.id === d.activeContext)?.name ?? d.activeContext}`
-      ta.value = r?.note ?? ''
-      let h: number | undefined
-      ta.oninput = () => { clearTimeout(h); h = window.setTimeout(() => void send({ type: 'note', set: d.set, oracleId: d.oracleId, context: d.activeContext, note: ta.value }), 500) }
-      wrap.append(ta)
-      break
-    }
     case 'tags': {
+      const body = block('sec:tags', `${SECTION_TITLE.tags} (${d.tags.length})`)
       const chips = el('div', 'lg-chips')
       const draw = () => {
         chips.replaceChildren()
@@ -139,27 +188,27 @@ function section(id: SectionId, d: OverlayCard): HTMLElement {
           c.append(x); chips.append(c)
         }
         const inp = el('input', 'lg-tag-in') as HTMLInputElement; inp.placeholder = 'add tag…'
-        inp.onkeydown = async e => { if (e.key === 'Enter' && inp.value.trim()) { const tg = inp.value.trim().toLowerCase().replace(/^#/, ''); await send({ type: 'tag', oracleId: d.oracleId, tag: tg }); if (!d.tags.includes(tg)) d.tags.push(tg); draw() } }
+        inp.onkeydown = async e => { if (e.key === 'Enter' && inp.value.trim()) { const tg = inp.value.trim().toLowerCase().replace(/^#/, ''); await send({ type: 'tag', oracleId: d.oracleId, tag: tg }); if (!d.tags.includes(tg)) d.tags.push(tg); draw(); chips.querySelector<HTMLInputElement>('.lg-tag-in')?.focus() } }
         chips.append(inp)
       }
-      draw(); wrap.append(chips)
+      draw(); body.append(chips)
       break
     }
     case 'links': {
-      wrap.append(el('div', 'lg-h', `Links (${d.links.length})`))
+      const body = block('sec:links', `${SECTION_TITLE.links} (${d.links.length})`)
       for (const l of d.links) {
         const row = el('div', 'lg-link')
         const a = el('a', 'lg-name', l.name); a.href = `https://scryfall.com/search?q=${encodeURIComponent(`!"${l.name}"`)}`
         row.append(a); for (const tg of l.tags) row.append(el('span', 'lg-type', `#${tg}`))
         if (l.note) { const n = el('span', 'lg-muted', ' ✎'); n.title = l.note; row.append(n) }
-        wrap.append(row)
+        body.append(row)
       }
-      if (!d.links.length) wrap.append(el('div', 'lg-muted', 'no links — add them in the grader'))
+      if (!d.links.length) body.append(el('div', 'lg-muted', 'no links — add them in the grader'))
       break
     }
     case 'community': {
-      wrap.append(el('div', 'lg-h', '17lands'))
-      if (!d.community) { wrap.append(el('div', 'lg-muted', 'no snapshot for this set')); break }
+      const body = block('sec:community', SECTION_TITLE.community)
+      if (!d.community) { body.append(el('div', 'lg-muted', 'no snapshot for this set')); break }
       const c = d.community
       const pct = (v: number | null) => v == null ? '—' : `${(v * 100).toFixed(1)}%`
       const kv = el('div', 'lg-kv')
@@ -167,7 +216,7 @@ function section(id: SectionId, d: OverlayCard): HTMLElement {
       add('GIH WR', `${pct(c.gih)}${c.percentile != null ? ` (P${c.percentile})` : ''}`)
       add('OH WR', pct(c.oh)); add('IWD', c.iwd == null ? '—' : `${(c.iwd * 100).toFixed(1)}pp`)
       add('ALSA / ATA', `${c.alsa?.toFixed(2) ?? '—'} / ${c.ata?.toFixed(2) ?? '—'}`); add('Games', c.games.toLocaleString())
-      wrap.append(kv)
+      body.append(kv)
       break
     }
   }
