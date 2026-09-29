@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGrader, type SortKey, type SortRule } from '../state'
-import { useScope } from '../scope'
+import { useQueryScope } from '../scope'
 import { FEATURES } from '../features'
 
 // Notion-style sort: an ordered list of rules, each with a key and direction. First rule wins, ties fall through.
 export default function SortMenu() {
   const g = useGrader()
-  const sc = useScope()
+  const sc = useQueryScope()
   const sorts = sc.q.sorts
   const setSorts = (v: SortRule[]) => sc.patch({ sorts: v })
   const [open, setOpen] = useState(false)

@@ -24,7 +24,8 @@ export interface SerializedQuery {
   tagF: string
   sorts: SortRule[]
   view: View
-  zoom: number                                   // grid thumbnail minimum width in px
+  zoom: number                                   // legacy (v0.10) thumbnail width — kept so old layouts still parse
+  cols: number                                   // grid columns; the card width follows from the panel width
 }
 // What the UI touches.
 export interface ScopeQuery extends Omit<SerializedQuery, 'colorF' | 'rarityF'> {
@@ -34,7 +35,7 @@ export interface ScopeQuery extends Omit<SerializedQuery, 'colorF' | 'rarityF'> 
 
 export const DEFAULT_QUERY: SerializedQuery = {
   textF: '', searchScope: 'active', colorF: [], rarityF: [], ratedF: 'all', tierF: '', tagF: '',
-  sorts: [{ key: 'number', dir: 'asc' }], view: 'grid', zoom: 150,
+  sorts: [{ key: 'number', dir: 'asc' }], view: 'grid', zoom: 150, cols: 6,
 }
 
 export const hydrate = (q?: Partial<SerializedQuery> | null): ScopeQuery => {

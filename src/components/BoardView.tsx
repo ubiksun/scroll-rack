@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { setCardDrag } from '../dnd'
 import { upsertRating, type Card, type Context, type Rating, type Scheme } from '../db'
 
 interface Props {
@@ -9,11 +10,13 @@ interface Props {
   imageOf: (c: Card, size?: 'small' | 'normal' | 'large') => string
   selectedId: string | null
   onSelect: (c: Card, e: React.MouseEvent) => void
+  onOpen?: (c: Card, e: React.MouseEvent) => void
+  onPeek?: (c: Card, e: React.MouseEvent) => void
 }
 
 // Tier board: one zone per tier + an Unrated pool. Drag a card onto a zone to rate it. Cards inside a zone sit in an
-// overlapping stack (snap = the flex layout); hovering a stack fans it out. Context tabs pick which rating you're setting.
-export default function BoardView({ cards, contexts, schemes, ratingOf, imageOf, selectedId, onSelect }: Props) {
+// overlapping stack; hovering ONE card lifts it (the stack itself never re-flows). Context tabs pick which rating you're setting.
+export default function BoardView({ cards, contexts, schemes, ratingOf, imageOf, selectedId, onSelect, onOpen, onPeek }: Props) {
   // the stack renders each card at 100px, which needs 200 real pixels on a HiDPI screen — more than `small` has
   const stackSize = (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1) > 1 ? 'normal' : 'small'
   const [ctxId, setCtxId] = useState(contexts[0]?.id ?? 'limited')
@@ -52,8 +55,8 @@ export default function BoardView({ cards, contexts, schemes, ratingOf, imageOf,
             {z.cards.map(c => (
               <img key={c.id} src={imageOf(c, stackSize)} alt={c.name} title={c.name} draggable
                 className={c.id === selectedId ? 'sel' : ''}
-                onDragStart={e => { e.dataTransfer.setData('text/card', c.id); e.dataTransfer.effectAllowed = 'move' }}
-                onClick={e => onSelect(c, e)} />
+                onDragStart={e => { e.dataTransfer.setData('text/card', c.id); setCardDrag(e, c, c.name); e.dataTransfer.effectAllowed = 'all' }}
+                onClick={e => onSelect(c, e)} onDoubleClick={e => onOpen?.(c, e)} onContextMenu={e => onPeek?.(c, e)} />
             ))}
           </div>
         </div>

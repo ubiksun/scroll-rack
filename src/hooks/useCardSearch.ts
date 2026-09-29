@@ -16,7 +16,7 @@ export function useCardSearch(textF: string, searchScope: 'active' | 'all', acti
     const q = textF.trim()
     setGlobalResults(null)
     if (!q || (searchScope === 'active' && !activeSets.length)) { setSearchIds(null); setSearchState('idle'); return }
-    // CJK query → Scryfall can't match 大學院廢墟 names; search the local Chinese layer instead
+    // CJK query → Scryfall can't match 大学院废墟 names; search the local Chinese layer instead
     if (/[\u3400-\u9fff]/.test(q)) { setSearchIds(null); setSearchState('local'); return }
     const ctrl = new AbortController()
     setSearchState('busy')

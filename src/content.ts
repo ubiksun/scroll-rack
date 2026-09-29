@@ -47,10 +47,12 @@ async function renderCardPanel() {
 
   // header (drag handle)
   const head = el('div', 'lg-head')
-  head.append(el('span', 'lg-title', 'Scroll Rack'))
+  // the overlay follows the BROWSER locale (chrome.i18n), not the app's language setting: it has no store access here
+  const appName = (typeof chrome !== 'undefined' && chrome.i18n?.getMessage('extName')) || 'Scroll Rack'
+  head.append(el('span', 'lg-title', appName))
   const tools = el('span', 'lg-tools')
   const gear = el('button', 'lg-btn', '⚙'); gear.title = 'sections'
-  const openBtn = el('button', 'lg-btn', '↗'); openBtn.title = 'open Scroll Rack'
+  const openBtn = el('button', 'lg-btn', '↗'); openBtn.title = (typeof chrome !== 'undefined' && chrome.i18n?.getMessage('actionTitle')) || 'open Scroll Rack'
   const collapse = el('button', 'lg-btn', prefs.collapsed ? '▸' : '▾')
   tools.append(gear, openBtn, collapse); head.append(tools); panel.append(head)
   openBtn.onclick = () => void send({ type: 'openApp' })

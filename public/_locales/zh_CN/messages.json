@@ -1,11 +1,11 @@
 {
   "extName": {
-    "message": "Scroll Rack"
+    "message": "卷轴架"
   },
   "extDesc": {
-    "message": "Scroll rack是一款用于对万智牌进行评分和注释的浏览器扩展程序"
+    "message": "卷轴架是一款用于对万智牌进行评分和注释的浏览器扩展程序"
   },
   "actionTitle": {
-    "message": "打开 Scroll Rack"
+    "message": "打开卷轴架"
   }
 }

@@ -6,7 +6,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 VER=$(node -p "require('./public/manifest.json').version")
+# Release notes: the argument, else the newest section of CHANGELOG.md (first "## " block, bullet lines joined).
 NOTES=${1:-}
+if [ -z "$NOTES" ] && [ -f CHANGELOG.md ]; then
+  NOTES=$(awk '/^## /{n++} n==1 && /^- /{sub(/^- /,""); printf "%s%s", sep, $0; sep=" · "}' CHANGELOG.md)
+fi
 npm run build >/dev/null
 cp release/INSTALL.md dist/README-TESTERS.md
 sed -i '' -E "s/v[0-9]+\.[0-9]+\.[0-9]+/v$VER/g" dist/README-TESTERS.md release/INSTALL.md

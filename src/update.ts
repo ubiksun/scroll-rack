@@ -7,7 +7,8 @@ const CHECK_EVERY = 6 * 60 * 60 * 1000
 
 export interface LatestInfo { version: string; zip: string; notes?: string; date?: string }
 
-export const currentVersion = () => (typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : '0.0.0')
+declare const __SR_VERSION__: string   // injected by vite.config.ts from public/manifest.json (the web/LAN test build has no chrome.runtime)
+export const currentVersion = () => (typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : __SR_VERSION__)
 
 export function isNewer(a: string, b: string) {   // a > b ?
   const pa = a.split('.').map(Number), pb = b.split('.').map(Number)

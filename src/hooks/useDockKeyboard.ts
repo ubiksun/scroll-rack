@@ -1,12 +1,13 @@
 import { useEffect, type MutableRefObject } from 'react'
 import type { DockviewApi } from 'dockview-react'
 import { upsertRating } from '../db'
-import { asCard } from '../docks'
+import { asDock } from '../docks'
 import { useGrader } from '../state'
 
-// Global keyboard: ← → navigate the FOCUSED search dock · 1–9 tier on the focused card · n notes · Esc back to grid.
-// Moved out of GraderProvider in v0.10 — with N docks "current" has to be resolved through the dock topology, and the
-// note textarea is addressed by `${panelId}-note-${ctxId}` because several CardPanels can be mounted at once.
+// Global keyboard, resolved through the dock last touched:
+//   in a search dock:   ← → move the highlight · Enter loads it · 1–9 rate the channel's card (or the highlight)
+//   in a follower dock: ← → step the channel's list and load · 1–9 rate its card
+//   n = the note box of a comments dock in the same channel · Esc = close the peek / leave the input
 export function useDockKeyboard(apiRef: MutableRefObject<DockviewApi | null>) {
   const g = useGrader()
   useEffect(() => {
@@ -14,17 +15,22 @@ export function useDockKeyboard(apiRef: MutableRefObject<DockviewApi | null>) {
       const el = e.target as HTMLElement
       const tag = el.tagName
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable
-      const nav = g.navOf(g.activeScopeId)
-      if (e.key === 'Escape') { el.blur?.(); if (!typing && nav?.view === 'single') nav.setView('grid'); return }
+      if (e.key === 'Escape') { g.closePeek(); g.setPicking(null); el.blur?.(); return }
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return
-      if (e.key === 'ArrowRight') { nav?.goNext(); e.preventDefault(); return }
-      if (e.key === 'ArrowLeft') { nav?.goPrev(); e.preventDefault(); return }
-
-      // the card the rating keys act on: the focused card dock, else the focused search dock's selection
       const api = apiRef.current
-      const panel = g.activeCardPanelId ? api?.getPanel(g.activeCardPanelId) : undefined
-      const bound = panel ? asCard(panel.params) : undefined
-      const card = (bound?.set && bound.oracleId ? g.cardByKey.get(`${bound.set}:${bound.oracleId}`) : undefined) ?? nav?.selected ?? null
+      const active = (g.activeDockId ? api?.getPanel(g.activeDockId) : undefined) ?? api?.activePanel
+      if (!active) return
+      const p = asDock(active.params)
+      const isSearch = p.kind === 'search'
+      const nav = isSearch ? g.navOf(p.scopeId ?? 'main') : g.navOfChannel(p.channel)
+
+      if (e.key === 'ArrowRight') { if (isSearch) nav?.goNext(); else nav?.loadStep?.(1); e.preventDefault(); return }
+      if (e.key === 'ArrowLeft') { if (isSearch) nav?.goPrev(); else nav?.loadStep?.(-1); e.preventDefault(); return }
+      if (e.key === 'Enter' && isSearch) { nav?.loadSelected?.(); return }
+
+      const channel = isSearch ? active.id : p.channel
+      const ref = isSearch ? g.channelCards[active.id] : (p.linked ? g.channelCards[p.channel] : p.own)
+      const card = (ref ? g.cardByKey.get(`${ref.set}:${ref.oracleId}`) : undefined) ?? (isSearch ? nav?.selected : null) ?? null
 
       if (/^[1-9]$/.test(e.key) && card && g.firstCtx && g.firstScheme) {
         const tier = g.firstScheme.tiers[Number(e.key) - 1]
@@ -33,12 +39,12 @@ export function useDockKeyboard(apiRef: MutableRefObject<DockviewApi | null>) {
       }
       if (e.key === 'n' && g.firstCtx) {
         e.preventDefault()
-        const id = panel ? `${panel.id}-note-${g.firstCtx.id}` : null
-        const box = (id && document.getElementById(id)) || document.querySelector(`[id$="-note-${g.firstCtx.id}"]`)
+        const comment = api?.panels.find(x => { const d = asDock(x.params); return d.kind === 'comment' && d.linked && d.channel === channel }) ?? api?.panels.find(x => asDock(x.params).kind === 'comment')
+        const box = comment ? document.getElementById(`${comment.id}-note-${g.firstCtx.id}`) : null
         ;(box as HTMLTextAreaElement | null)?.focus()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [apiRef, g.activeScopeId, g.activeCardPanelId, g.navOf, g.cardByKey, g.firstCtx, g.firstScheme, g.ratingOf])
+  }, [apiRef, g.activeDockId, g.navOf, g.navOfChannel, g.channelCards, g.cardByKey, g.firstCtx, g.firstScheme, g.ratingOf, g.closePeek, g.setPicking])
 }

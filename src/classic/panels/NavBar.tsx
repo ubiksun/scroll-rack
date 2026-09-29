@@ -1,19 +1,17 @@
-import { useGrader } from '../state'
+import { useGrader } from '../../state'
 import { useScope } from '../scope'
-import { t } from '../i18n'
+import { t } from '../../i18n'
 
-// Prev/next strip of a search dock's Card view: moves the HIGHLIGHT within this dock's list (Enter / double-click loads).
+// Shared prev/next strip (Browse card view + Graph). Position is within THIS dock's filter.
 export default function NavBar() {
   const g = useGrader()
   const s = useScope()
-  const pos = s.selected ? `${s.selIndex + 1} / ${s.navList.length}` : `— / ${s.navList.length}`
   return (
     <div className="single-nav">
       <button onClick={s.goPrev} disabled={s.selIndex <= 0}>{t('prev')}</button>
-      <span className="status">{pos}</span>
+      <span className="status">{s.selected ? `${s.selIndex + 1} / ${s.navList.length}` : `— / ${s.navList.length}`}</span>
       <button onClick={s.goNext} disabled={s.selIndex >= s.navList.length - 1}>{t('next')}</button>
       {s.selected && <span className="status ell" style={{ maxWidth: 260 }}>{g.nameOf(s.selected)}</span>}
-      {s.selected && <button className="mini" onClick={() => s.load(s.selected!)}>{t('loadBtn')}</button>}
     </div>
   )
 }

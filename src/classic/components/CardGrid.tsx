@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import type { Card, BadgeStyle } from '../db'
-import { t } from '../i18n'
-import { setCardDrag } from '../dnd'
+import type { Card, BadgeStyle } from '../../db'
+import { t } from '../../i18n'
 
 export interface BadgeInfo { ctxId: string; ctx: string; tier: string; color: string; style?: BadgeStyle }
 
@@ -17,43 +15,31 @@ interface Props {
   cards: Card[]
   badgesFor: (c: Card) => BadgeInfo[]   // one badge per context that has a tier
   selectedId: string | null
-  onSelect: (c: Card) => void                       // single click: highlight
-  onOpen: (c: Card, e: React.MouseEvent) => void    // double click: load
-  onPeek: (c: Card, e: React.MouseEvent) => void    // right click: oracle text at the pointer
+  onSelect: (c: Card, e: React.MouseEvent) => void
   community?: Map<string, number>       // card name → GIH WR percentile (only when shown)
   linkedIds: Set<string>                // oracleIds that have ≥1 edge
   imageOf: (c: Card, size?: 'small' | 'normal' | 'large') => string
   nameOf?: (c: Card) => string
-  cols: number                          // cards per row — the zoom. One column per step, so nothing re-flows mid-drag.
+  zoom?: number                         // minimum thumbnail width in px; the grid still fills the panel
 }
 
-const GAP = 10
-
-export default function CardGrid({ cards, badgesFor, selectedId, onSelect, onOpen, onPeek, community, linkedIds, imageOf, nameOf, cols }: Props) {
-  const el = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(0)
-  useEffect(() => {
-    if (!el.current) return
-    const ro = new ResizeObserver(en => setWidth(Math.round(en[0].contentRect.width)))
-    ro.observe(el.current)
-    return () => ro.disconnect()
-  }, [])
+export default function CardGrid({ cards, badgesFor, selectedId, onSelect, community, linkedIds, imageOf, nameOf, zoom }: Props) {
   if (!cards.length) return <div className="empty">{t('noCards')}</div>
+  // Scryfall's `small` scan is 146px wide. The grid used to always ask for it, so the thumbnails were already soft on
+  // a HiDPI screen and turned to mush once the zoom control could push a tile past 146 CSS px. Pick the size from the
+  // pixels actually needed; `normal` (488px) costs more bytes, but the images are lazy-loaded and CDN-cached.
   // Scryfall scan widths: small 146 · normal 488 · large 672. Step up before the browser has to stretch anything —
   // on a 2x screen a 150px tile already needs 300 real pixels.
   const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1
-  const tile = width ? (width - GAP * (cols - 1)) / cols : 150
-  const need = tile * dpr
+  const need = (zoom ?? 150) * dpr
   const size: 'small' | 'normal' | 'large' = need > 488 ? 'large' : need > 146 ? 'normal' : 'small'
   return (
-    <div ref={el} className="grid" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: GAP }}>
+    <div className="grid" style={zoom ? ({ '--card-min': `${zoom}px` } as React.CSSProperties) : undefined}>
       {cards.map(c => {
         const p = community?.get(c.name)
         return (
-          <div key={c.id} className={`card${c.id === selectedId ? ' selected' : ''}`} title={nameOf ? nameOf(c) : c.name}
-            onClick={() => onSelect(c)} onDoubleClick={e => onOpen(c, e)} onContextMenu={e => onPeek(c, e)}
-            draggable onDragStart={e => { setCardDrag(e, c, nameOf ? nameOf(c) : c.name); e.dataTransfer.effectAllowed = 'all' }}>
-            <img src={imageOf(c, size)} alt={c.name} loading="lazy" draggable={false} />
+          <div key={c.id} className={`card${c.id === selectedId ? ' selected' : ''}`} onClick={e => onSelect(c, e)} title={nameOf ? nameOf(c) : c.name}>
+            <img src={imageOf(c, size)} alt={c.name} loading="lazy" />
             <BadgeStacks badges={badgesFor(c)} />
             {linkedIds.has(c.oracleId) && <span className="dot" title="has links" />}
             {p !== undefined && <span className="comm">P{p}</span>}

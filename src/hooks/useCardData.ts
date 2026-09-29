@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Card, CardTag, CommunityTagsRow, Edge, Rating } from '../db'
+import { COUNTERPART_TAG, type Card, type CardTag, type CommunityTagsRow, type Edge, type Rating } from '../db'
 import { fetchCommunityTags, useGrader } from '../state'
 
 export interface CardData {
@@ -18,7 +18,9 @@ export function useCardData(card: Card | null): CardData {
   const key = card ? `${card.set}:${card.oracleId}` : ''
   const ratings = useMemo(() => key ? [...(g.ratings.get(key)?.values() ?? [])] : [], [key, g.ratings])
   const tags = useMemo(() => oracleId ? g.allTagRows.filter(x => x.oracleId === oracleId) : [], [oracleId, g.allTagRows])
-  const edges = useMemo(() => oracleId ? g.edges.filter(e => e.a === oracleId || e.b === oracleId) : [], [oracleId, g.edges])
+  // counterpart edges (FRA Echoverse pairs) are surfaced by the pair UI, so they are NOT links here — otherwise the
+  // partner showed up twice: once as the pair, once as a link
+  const edges = useMemo(() => oracleId ? g.edges.filter(e => (e.a === oracleId || e.b === oracleId) && !e.tags.includes(COUNTERPART_TAG)) : [], [oracleId, g.edges])
   const partner = useMemo(() => {
     const pid = oracleId ? g.partnerOf.get(oracleId) : undefined
     return pid ? g.cardsByOracle.get(pid) : undefined

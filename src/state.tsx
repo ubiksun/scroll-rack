@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, ensureDefaults, getSetting, setSetting, pickPrinting, applyBadgePrefs, type BadgePrefs, type BadgeStyle, type ArtMode, type ArtPref, type Card, type CardTag, type CommunitySnapshot, type Context, type Edge, type Rating, type Scheme, type SetMeta } from './db'
+import { db, ensureDefaults, dedupeEdges, autoPairCounterparts, getSetting, setSetting, pickPrinting, applyBadgePrefs, COUNTERPART_TAG, type BadgePrefs, type BadgeStyle, type ArtMode, type ArtPref, type Card, type CardTag, type CommunitySnapshot, type Context, type Edge, type Rating, type Scheme, type SetMeta } from './db'
 import { fetchSet } from './api/scryfall'
 import { fetchCommunity, gihPercentiles } from './api/seventeen'
 import { FEATURES } from './features'
 import { fetchCommunityTags as fetchCommunityTagsDirect } from './api/tagger'
 import { fetchZhSet } from './api/mtgch'
-import { setLang as setI18n, type Lang } from './i18n'
+import { setLang as setI18n, t, type Lang } from './i18n'
 import { isBasicLand, TIER_SEP, type QueryDeps, type View } from './query'
 import type { ZhCard } from './db'
 // In the extension, Tagger requests go through the background worker (see background.ts); the vite preview calls directly.
@@ -16,7 +16,9 @@ export const fetchCommunityTags: typeof fetchCommunityTagsDirect = (set, cn, ora
     : fetchCommunityTagsDirect(set, cn, oracleId, force)
 import type { BadgeInfo } from './components/CardGrid'
 import { PANEL_SECTIONS, type SectionId } from './components/CardPanel'
-import type { OracleLang, OracleMode } from './docks'
+import type { CardRef, LinkStyle, OracleLang, TabPlacement } from './docks'
+import type { OracleMode } from './classic/docks'
+export type WorkspaceMode = 'classic' | 'wired'
 
 export { isBasicLand } from './query'
 export type { View, SortKey, SortRule } from './query'
@@ -31,10 +33,15 @@ const atSize = (url: string, size: ImgSize) => {
   return m ? url.replace(m[0], `/${size}/`) : url
 }
 
-// What a Browse dock registers with the store so the shell's keyboard handler and the export menu can reach it.
+// What a search dock registers with the store so the shell's keyboard handler, the image dock's ← → and the
+// export menu can reach it.
 export interface NavHandle {
-  goPrev: () => void
+  channel?: string                   // wired mode: the search dock's panel id
+  linked?: boolean
+  goPrev: () => void                 // move the highlight
   goNext: () => void
+  loadStep?: (delta: number) => void // wired mode: step from the channel's card and load
+  loadSelected?: () => void
   setView: (v: View) => void
   showPairOnce: (oracleId: string) => void
   view: View
@@ -64,22 +71,37 @@ export interface Grader {
   sections: SectionId[]; reorderSection: (id: SectionId, toIndex: number) => void; collapsed: Set<string>; toggleCollapse: (id: string) => void
   sectionHeights: Record<string, number>; setSectionHeight: (id: string, px: number | null) => void
   ratedCount: number; showBasics: boolean
-  // language layer (大學院廢墟)
+  // language layer (大学院废墟)
   lang: Lang; setLang: (l: Lang) => void; cardLang: Lang; setCardLang: (l: Lang) => void
   zhOf: (c: Card) => ZhCard | undefined; zhRowOf: (c: Card) => ZhCard | undefined
   nameOf: (c: Card) => string; typeOf: (c: Card) => string; oracleOf: (c: Card) => string; zhImageOf: (c: Card) => string | undefined
-  // Oracle panel prefs (v0.10)
-  oracleMode: OracleMode; setOracleMode: (m: OracleMode) => void
+  // Oracle zone language (v0.10) · where ⌘-click puts a new card tab (v0.11)
   oracleLang: OracleLang; setOracleLang: (l: OracleLang) => void
+  newTabPlacement: TabPlacement; setNewTabPlacement: (p: TabPlacement) => void
+  linkStyle: LinkStyle; setLinkStyle: (s: LinkStyle) => void
+  // which workspace is mounted: 'classic' = the published v0.10 docks · 'wired' = the test build's wired panels
+  workspaceMode: WorkspaceMode; setWorkspaceMode: (m: WorkspaceMode) => void
+  // classic mode only
+  oracleMode: OracleMode; setOracleMode: (m: OracleMode) => void
+  activeCardPanelId: string | null; setActiveCardPanel: (id: string | null) => void
   // experiments
   taggerOn: boolean
   // counterpart pairs
   partnerOf: Map<string, string>; hasPairs: boolean; pairMode: boolean
   pairSetting: 'auto' | 'off' | undefined; setPairSetting: (v: 'auto' | 'off') => void
-  // dock focus + per-scope handles (refs, so registering never re-renders anyone)
+  // channels (v0.13): the card each search dock has loaded, keyed by the search dock's panel id
+  channelCards: Record<string, CardRef | null>; setChannelCard: (ch: string, ref: CardRef | null) => void
+  // wire UI: the group being lit (a search dock id, or `self:<dock>` for a frozen follower) · the follower being wired
+  glow: string | null; setGlow: (id: string | null) => void
+  wiring: string | null; setWiring: (id: string | null) => void
+  picking: string | null; setPicking: (id: string | null) => void   // icon style: the follower waiting for a search to be clicked
+  // the dock last touched (keyboard target) + the search dock last touched (export, arrows)
+  activeDockId: string | null; setActiveDock: (id: string | null) => void
   activeScopeId: string; setActiveScope: (id: string) => void
-  activeCardPanelId: string | null; setActiveCardPanel: (id: string | null) => void
   registerNav: (scopeId: string, h: NavHandle) => void; navOf: (scopeId: string) => NavHandle | undefined
+  navOfChannel: (ch: string) => NavHandle | undefined
+  // right-click "peek": a card's oracle text floating at the pointer until the next click
+  peek: { card: Card; x: number; y: number } | null; showPeek: (card: Card, x: number, y: number) => void; closePeek: () => void
 }
 
 const Ctx = createContext<Grader | null>(null)
@@ -96,16 +118,28 @@ export function GraderProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [sectionHeights, setSectionHeights] = useState<Record<string, number>>({})
   const [lang, setLangState] = useState<Lang>('en')          // UI strings
-  const [cardLang, setCardLangState] = useState<Lang>('en')  // card names / text / scans (大學院廢墟 when 中文)
-  const [oracleMode, setOracleModeState] = useState<OracleMode>('shared')
+  const [cardLang, setCardLangState] = useState<Lang>('en')  // card names / text / scans (大学院废墟 when 中文)
   const [oracleLang, setOracleLangState] = useState<OracleLang>('follow')
-  const [activeScopeId, setActiveScope] = useState('main')
+  const [newTabPlacement, setNewTabPlacement] = useState<TabPlacement>('right')
+  const [linkStyle, setLinkStyle] = useState<LinkStyle>('wire')
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('classic')
+  const [oracleMode, setOracleModeState] = useState<OracleMode>('shared')
   const [activeCardPanelId, setActiveCardPanel] = useState<string | null>(null)
+  const [picking, setPicking] = useState<string | null>(null)
+  const [activeScopeId, setActiveScope] = useState('main')
+  const [activeDockId, setActiveDock] = useState<string | null>(null)
+  const [channelCards, setChannelCards] = useState<Record<string, CardRef | null>>({})
+  const [glow, setGlow] = useState<string | null>(null)
+  const [wiring, setWiring] = useState<string | null>(null)
+  const [peek, setPeek] = useState<{ card: Card; x: number; y: number } | null>(null)
   const navs = useRef(new Map<string, NavHandle>())
 
   useEffect(() => {
     (async () => {
       await ensureDefaults()
+      await dedupeEdges()
+      // 2026-09-28: the FRA "Way of the …" twins were paired by colour, which is wrong — recompute once for cached FRA
+      if (!(await getSetting<boolean>('fraPairsV2', false))) { if (await db.sets.get('fra')) await autoPairCounterparts('fra'); await setSetting('fraPairsV2', true) }
       const legacy = await getSetting('activeSet', '')
       setActiveSets(await getSetting<string[]>('activeSets', legacy ? [legacy] : []))
       setShowCommunity(await getSetting('showCommunity', false))
@@ -113,10 +147,14 @@ export function GraderProvider({ children }: { children: ReactNode }) {
       setSections([...saved.filter(s => PANEL_SECTIONS.includes(s)), ...PANEL_SECTIONS.filter(s => !saved.includes(s))])
       setCollapsed(new Set(await getSetting<string[]>('collapsed', [])))
       setSectionHeights(await getSetting<Record<string, number>>('cardSectionHeights', {}))
-      const l = await getSetting<Lang>('lang', 'en'); setI18n(l); setLangState(l)
+      const l = await getSetting<Lang>('lang', 'en'); setI18n(l); setLangState(l); document.title = t('appName')
       setCardLangState(await getSetting<Lang>('cardLang', 'en'))
-      setOracleModeState(await getSetting<OracleMode>('oracleMode', 'shared'))
       setOracleLangState(await getSetting<OracleLang>('oracleLang', 'follow'))
+      setNewTabPlacement(await getSetting<TabPlacement>('newTabPlacement', 'right'))
+      setLinkStyle(await getSetting<LinkStyle>('linkStyle', 'wire'))
+      setWorkspaceMode(await getSetting<WorkspaceMode>('workspaceMode', 'classic'))
+      setOracleModeState(await getSetting<OracleMode>('oracleMode', 'shared'))
+      setChannelCards(await getSetting<Record<string, CardRef | null>>('channelCards', {}))
       setReady(true)
     })()
   }, [])
@@ -127,7 +165,11 @@ export function GraderProvider({ children }: { children: ReactNode }) {
   useEffect(() => { if (ready) void setSetting('cardSectionHeights', sectionHeights) }, [sectionHeights, ready])
   useEffect(() => { if (ready) void setSetting('lang', lang) }, [lang, ready])
   useEffect(() => { if (ready) void setSetting('cardLang', cardLang) }, [cardLang, ready])
+  useEffect(() => { if (ready) void setSetting('newTabPlacement', newTabPlacement) }, [newTabPlacement, ready])
+  useEffect(() => { if (ready) void setSetting('linkStyle', linkStyle) }, [linkStyle, ready])
+  useEffect(() => { if (ready) void setSetting('workspaceMode', workspaceMode) }, [workspaceMode, ready])
   useEffect(() => { if (ready) void setSetting('oracleMode', oracleMode) }, [oracleMode, ready])
+  useEffect(() => { if (ready) void setSetting('channelCards', channelCards) }, [channelCards, ready])
   useEffect(() => { if (ready) void setSetting('oracleLang', oracleLang) }, [oracleLang, ready])
 
   const localSets = useLiveQuery(() => db.sets.orderBy('code').toArray(), []) ?? []
@@ -158,8 +200,8 @@ export function GraderProvider({ children }: { children: ReactNode }) {
       for (const code of activeSets) {
         if (zhSetsLoaded.has(code)) continue
         if (!(await db.sets.get(code))) continue
-        setStatus(`大學院廢墟：載入 ${code.toUpperCase()} 中文資料…`)
-        try { const n = await fetchZhSet(code); if (live) setStatus(`大學院廢墟：${code.toUpperCase()} ${n} 張中文資料`) } catch (e) { if (live) setStatus(`大學院廢墟 ${code.toUpperCase()}: ${String(e)}`) }
+        setStatus(`大学院废墟：载入 ${code.toUpperCase()} 中文资料…`)
+        try { const n = await fetchZhSet(code); if (live) setStatus(`大学院废墟：${code.toUpperCase()} ${n} 张中文资料`) } catch (e) { if (live) setStatus(`大学院废墟 ${code.toUpperCase()}: ${String(e)}`) }
       }
     })()
     return () => { live = false }
@@ -188,7 +230,7 @@ export function GraderProvider({ children }: { children: ReactNode }) {
   const artPrefs = useMemo(() => new Map(artPrefRows.map(a => [a.key, a])), [artPrefRows])
   const cardsByOracle = useMemo(() => new Map(allCards.map(c => [c.oracleId, c])), [allCards])
   const cardByKey = useMemo(() => new Map(allCards.map(c => [rk(c.set, c.oracleId), c])), [allCards])
-  const linkedIds = useMemo(() => { const s = new Set<string>(); edges.forEach(e => { s.add(e.a); s.add(e.b) }); return s }, [edges])
+  const linkedIds = useMemo(() => { const s = new Set<string>(); edges.forEach(e => { if (!e.tags.includes(COUNTERPART_TAG)) { s.add(e.a); s.add(e.b) } }); return s }, [edges])
   const tagsByCard = useMemo(() => { const m = new Map<string, Set<string>>(); allTagRows.forEach(x => { if (!m.has(x.oracleId)) m.set(x.oracleId, new Set()); m.get(x.oracleId)!.add(x.tag) }); return m }, [allTagRows])
   const allTags = useMemo(() => [...new Set(allTagRows.map(x => x.tag))].sort(), [allTagRows])
   const communityRows = useMemo(() => new Map(communitySnaps.flatMap(s => s.rows).map(r => [r.name, r])), [communitySnaps])
@@ -265,6 +307,11 @@ export function GraderProvider({ children }: { children: ReactNode }) {
 
   const registerNav = useCallback((scopeId: string, h: NavHandle) => { navs.current.set(scopeId, h) }, [])
   const navOf = useCallback((scopeId: string) => navs.current.get(scopeId), [])
+  // the linked search dock driving a channel (first registered wins) — what an image dock's ← → step through
+  const navOfChannel = useCallback((ch: string) => [...navs.current.values()].find(h => h.linked && h.channel === ch), [])
+  const setChannelCard = useCallback((ch: string, ref: CardRef | null) => setChannelCards(m => (m[ch]?.set === ref?.set && m[ch]?.oracleId === ref?.oracleId ? m : { ...m, [ch]: ref })), [])
+  const showPeek = useCallback((card: Card, x: number, y: number) => setPeek({ card, x, y }), [])
+  const closePeek = useCallback(() => setPeek(null), [])
 
   const value: Grader = {
     ready, status, setStatus, activeSets, localSets, busySet, toggleSet, pullSet, pullMany, ensureSetActive,
@@ -273,12 +320,13 @@ export function GraderProvider({ children }: { children: ReactNode }) {
     edges, allTagRows, allTags, linkedIds, tagsByCard, imageOf, artMode, artPrefs, setArtPref, tierOptions, queryDeps,
     showCommunity, setShowCommunity, percentiles, communityRows, communitySnaps, pullCommunity,
     sections, reorderSection, collapsed, toggleCollapse, sectionHeights, setSectionHeight, ratedCount, showBasics,
-    lang, setLang: (l: Lang) => { setI18n(l); setLangState(l) }, cardLang, setCardLang: setCardLangState,
+    lang, setLang: (l: Lang) => { setI18n(l); setLangState(l); document.title = t('appName') }, cardLang, setCardLang: setCardLangState,
     zhOf, zhRowOf, nameOf, typeOf, oracleOf, zhImageOf,
-    oracleMode, setOracleMode: setOracleModeState, oracleLang, setOracleLang: setOracleLangState,
+    oracleLang, setOracleLang: setOracleLangState, newTabPlacement, setNewTabPlacement, linkStyle, setLinkStyle, workspaceMode, setWorkspaceMode, oracleMode, setOracleMode: setOracleModeState, activeCardPanelId, setActiveCardPanel,
     taggerOn, partnerOf, hasPairs, pairMode,
     pairSetting, setPairSetting: v => { void setSetting('echoversePairs', v) },
-    activeScopeId, setActiveScope, activeCardPanelId, setActiveCardPanel, registerNav, navOf,
+    channelCards, setChannelCard, glow, setGlow, wiring, setWiring, picking, setPicking, activeDockId, setActiveDock, activeScopeId, setActiveScope, registerNav, navOf, navOfChannel,
+    peek, showPeek, closePeek,
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

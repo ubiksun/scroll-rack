@@ -1,7 +1,7 @@
 import { db, type Card, type Context, type Rating, type Scheme } from './db'
 import { exportBundle } from './db'
 
-function download(name: string, text: string, mime = 'text/plain') {
+export function download(name: string, text: string, mime = 'text/plain') {
   const blob = new Blob([text], { type: mime })
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href)
 }

@@ -1,19 +1,26 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import type { DockviewApi } from 'dockview-react'
 import { getSetting, setSetting, type Context, type Scheme } from '../db'
+import { defaultLayout, isSearchPanel, type Workspace } from '../docks'
+import { download } from '../export'
+import { dockLabels } from '../labels'
+import type { SerializedQuery } from '../query'
 import { useGrader } from '../state'
 import { t } from '../i18n'
 import { currentVersion } from '../update'
+import LinkStyleDemo from './LinkStyleDemo'
 import { BLOG_ICON } from './blogIcon'
 import TagTable from './TagTable'
 import SchemeEditor from './SchemeEditor'
 import BadgeDesign from './BadgeDesign'
 
-interface Props { contexts: Context[]; schemes: Scheme[]; onClose: () => void }
+interface Props { contexts: Context[]; schemes: Scheme[]; dock: { api: () => DockviewApi | null; seed: () => SerializedQuery }; onClose: () => void }
 
 // Everything outward-facing in one place, so it can be edited without hunting through JSX.
 const LINKS = {
   github: 'https://github.com/ubiksun/scroll-rack',
+  changelog: 'https://github.com/ubiksun/scroll-rack/blob/main/CHANGELOG.md',
   privacy: 'https://github.com/ubiksun/scroll-rack/blob/main/PRIVACY.md',
   license: 'https://github.com/ubiksun/scroll-rack/blob/main/LICENSE',
   x: 'https://x.com/Hitorikan1',
@@ -21,7 +28,7 @@ const LINKS = {
   blog: 'https://bluesdrivemonster.com/',
 }
 
-type PaneId = 'about' | 'language' | 'comments' | 'tiers' | 'badges' | 'oracle' | 'display' | 'pairs' | 'experimental'
+type PaneId = 'about' | 'language' | 'comments' | 'tiers' | 'badges' | 'display' | 'workspace' | 'pairs' | 'experimental'
 const NAV: { group: string; items: { id: PaneId; label: () => string }[] }[] = [
   { group: 'optAbout', items: [{ id: 'about', label: () => t('optAbout') }] },
   { group: 'optInterface', items: [
@@ -29,8 +36,8 @@ const NAV: { group: string; items: { id: PaneId; label: () => string }[] }[] = [
     { id: 'comments', label: () => t('optComments') },
     { id: 'tiers', label: () => t('optTiers') },
     { id: 'badges', label: () => t('optBadges') },
-    { id: 'oracle', label: () => t('optOracle') },
     { id: 'display', label: () => t('optDisplay') },
+    { id: 'workspace', label: () => t('optWorkspace') },
     { id: 'pairs', label: () => t('optPairs') },
   ] },
   { group: 'optExperimental', items: [{ id: 'experimental', label: () => t('optExperimental') }] },
@@ -58,7 +65,7 @@ const SOCIALS = [
 ]
 
 // ⚙ Options as a proper settings surface: a left nav grouped About / Interface / Experimental, one pane at a time.
-export default function OptionsModal({ contexts, schemes, onClose }: Props) {
+export default function OptionsModal({ contexts, schemes, dock, onClose }: Props) {
   const g = useGrader()
   const [pane, setPane] = useState<PaneId>('about')
   const [editScheme, setEditScheme] = useState<Scheme | null>(null)
@@ -91,9 +98,10 @@ export default function OptionsModal({ contexts, schemes, onClose }: Props) {
         <div className="opt-body">
           {pane === 'about' && (
             <section className="about">
-              <h3>Scroll Rack <span className="sub">v{currentVersion()}</span></h3>
+              <h3>{t('appName')} <span className="sub">v{currentVersion()}</span></h3>
               <p>{t('aboutWhat')}</p>
               <p className="sub">{t('aboutAuthor')} · {t('aboutBuilt')}</p>
+              <p><button onClick={() => { onClose(); window.dispatchEvent(new Event('sr:guide')) }}>{t('guideOpen')}</button></p>
               <h3 style={{ marginTop: 18 }}>{t('aboutLinks')}</h3>
               <div className="about-links">
                 {SOCIALS.map(s2 => (
@@ -102,6 +110,8 @@ export default function OptionsModal({ contexts, schemes, onClose }: Props) {
                 ))}
               </div>
               <div className="sub" style={{ marginTop: 14 }}>
+                <a href={LINKS.changelog} target="_blank" rel="noreferrer">{t('aboutChangelog')}</a>
+                {' · '}
                 <a href={LINKS.privacy} target="_blank" rel="noreferrer">{t('aboutPrivacy')}</a>
                 {' · '}
                 <a href={LINKS.license} target="_blank" rel="noreferrer">{t('aboutLicense')}</a>
@@ -111,10 +121,10 @@ export default function OptionsModal({ contexts, schemes, onClose }: Props) {
           )}
 
           {pane === 'language' && (
-            <section>
+            <section className="opt-form">
               <div className="opt-row"><span>{t('uiLanguage')}</span>{seg(g.lang, [{ v: 'en' as const, l: 'English' }, { v: 'zh' as const, l: '中文' }], g.setLang)}</div>
               <div className="opt-row"><span>{t('cardLanguage')} <span className="sub">{t('cardLanguageHint')}</span></span>{seg(g.cardLang, [{ v: 'en' as const, l: 'English' }, { v: 'zh' as const, l: '中文' }], g.setCardLang)}</div>
-              <div className="opt-row"><span>{t('oracleLangTitle')}</span>{seg(g.oracleLang, [{ v: 'follow' as const, l: t('oracleLangFollow') }, { v: 'en' as const, l: 'English' }, { v: 'zh' as const, l: '中文' }], g.setOracleLang)}</div>
+              <div className="opt-row"><span>{t('oracleLangTitle')} <span className="sub">{t('oracleLangHint')}</span></span>{seg(g.oracleLang, [{ v: 'follow' as const, l: t('oracleLangFollow') }, { v: 'en' as const, l: 'English' }, { v: 'zh' as const, l: '中文' }], g.setOracleLang)}</div>
             </section>
           )}
 
@@ -136,37 +146,121 @@ export default function OptionsModal({ contexts, schemes, onClose }: Props) {
 
           {pane === 'badges' && <section><BadgeDesign contexts={contexts} /></section>}
 
-          {pane === 'oracle' && (
-            <section>
-              <label className="row"><input type="radio" name="oraclemode" checked={g.oracleMode === 'shared'} onChange={() => g.setOracleMode('shared')} /> {t('oracleModeShared')}</label>
-              <label className="row"><input type="radio" name="oraclemode" checked={g.oracleMode === 'attached'} onChange={() => g.setOracleMode('attached')} /> {t('oracleModeAttached')}</label>
-              <label className="row"><input type="radio" name="oraclemode" checked={g.oracleMode === 'section'} onChange={() => g.setOracleMode('section')} /> {t('oracleModeSection')}</label>
-              <div className="opt-row" style={{ marginTop: 12 }}><span>{t('oracleLangTitle')}</span>{seg(g.oracleLang, [{ v: 'follow' as const, l: t('oracleLangFollow') }, { v: 'en' as const, l: 'English' }, { v: 'zh' as const, l: '中文' }], g.setOracleLang)}</div>
+          {pane === 'display' && (
+            <section className="opt-form">
+              <label className="opt-row"><span>{t('showBasics')}</span><input type="checkbox" checked={showBasics} onChange={e => setSetting('showBasicLands', e.target.checked)} /></label>
+              <label className="opt-row"><span>{t('showTabRename')} <span className="sub">{t('showTabRenameHint')}</span></span><input type="checkbox" checked={tabRename} onChange={e => setSetting('tabRenameButton', e.target.checked)} /></label>
+              {g.workspaceMode === 'classic' && (
+                <div className="opt-row"><span>{t('oracleTitle')}</span>{seg(g.oracleMode, [{ v: 'shared' as const, l: t('oracleModeSharedShort') }, { v: 'attached' as const, l: t('oracleModeAttachedShort') }, { v: 'section' as const, l: t('oracleModeSectionShort') }], g.setOracleMode)}</div>
+              )}
+              {g.workspaceMode === 'wired' && <>
+                <div className="opt-row"><span>{t('linkStyleTitle')}</span>{seg(g.linkStyle, [{ v: 'wire' as const, l: t('linkStyleWire') }, { v: 'chip' as const, l: t('linkStyleChip') }, { v: 'icon' as const, l: t('linkStyleIcon') }], g.setLinkStyle)}</div>
+                <div className="opt-block">
+                  <div className="opt-caption">{t('linkDemo')}</div>
+                  <LinkStyleDemo style={g.linkStyle} />
+                </div>
+              </>}
             </section>
           )}
 
-          {pane === 'display' && (
-            <section>
-              <label className="row"><input type="checkbox" checked={showBasics} onChange={e => setSetting('showBasicLands', e.target.checked)} /> Show basic lands (Plains / Island / … incl. Snow-Covered)</label>
-              <label className="row"><input type="checkbox" checked={tabRename} onChange={e => setSetting('tabRenameButton', e.target.checked)} /> {t('showTabRename')} <span className="sub">{t('showTabRenameHint')}</span></label>
-            </section>
-          )}
+          {pane === 'workspace' && <WorkspacePane dock={dock} />}
 
           {pane === 'pairs' && (
-            <section>
-              <label className="row"><input type="radio" name="pairs" checked={pairs === 'auto'} onChange={() => setSetting('echoversePairs', 'auto')} /> Auto — show both halves side by side, browse pair by pair</label>
-              <label className="row"><input type="radio" name="pairs" checked={pairs === 'off'} onChange={() => setSetting('echoversePairs', 'off')} /> Off — the pair button just jumps to the other half</label>
-              {pairs === undefined && <div className="sub">Not decided yet — you'll be asked the first time you press the pair button.</div>}
+            <section className="opt-form">
+              <label className="opt-row"><span>{t('pairsAuto')}</span><input type="radio" name="pairs" checked={pairs === 'auto'} onChange={() => setSetting('echoversePairs', 'auto')} /></label>
+              <label className="opt-row"><span>{t('pairsOff')}</span><input type="radio" name="pairs" checked={pairs === 'off'} onChange={() => setSetting('echoversePairs', 'off')} /></label>
+              {pairs === undefined && <div className="sub opt-note">{t('pairsUndecided')}</div>}
             </section>
           )}
 
           {pane === 'experimental' && (
-            <section>
-              <label className="row"><input type="checkbox" checked={tagger} onChange={e => setSetting('exp.tagger', e.target.checked)} /> Scryfall Tagger community tags (◈) in the Tags section — undocumented API, one request per card, cached 7 days</label>
+            <section className="opt-form">
+              <label className="opt-row"><span>{t('expWired')} <span className="sub">{t('expWiredHint')}</span></span><input type="checkbox" checked={g.workspaceMode === 'wired'} onChange={e => g.setWorkspaceMode(e.target.checked ? 'wired' : 'classic')} /></label>
+              <label className="opt-row"><span>{t('taggerOpt')} <span className="sub">{t('taggerOptHint')}</span></span><input type="checkbox" checked={tagger} onChange={e => setSetting('exp.tagger', e.target.checked)} /></label>
             </section>
           )}
         </div>
       </div>
     </div>
+  )
+}
+
+// ⚙ → Workspace: the saved layouts. A workspace = the dockview JSON (every panel, its place, its search and its
+// wires ride inside) plus the card each search had loaded. Save under a name (same name replaces), load, export to
+// a file, import one, delete. Files are plain JSON so they can be moved between machines with the data backup.
+const WS_FILE_KEY = 'scrollRackWorkspace'
+function WorkspacePane({ dock }: { dock: Props['dock'] }) {
+  const g = useGrader()
+  const [name, setName] = useState('')
+  const list = useLiveQuery(() => getSetting<Workspace[]>('workspaces', []), []) ?? []
+  const sorted = [...list].sort((a, b) => a.name.localeCompare(b.name))
+  const snapshot = (n: string): Workspace | null => {
+    const api = dock.api(); if (!api) return null
+    const cards: Workspace['channelCards'] = {}
+    for (const p of api.panels) if (isSearchPanel(p)) cards[p.id] = g.channelCards[p.id] ?? null
+    return { id: Date.now().toString(36), name: n, savedAt: Date.now(), layout: api.toJSON(), channelCards: cards }
+  }
+  const save = async () => {
+    const n = name.trim(); const ws = n ? snapshot(n) : null
+    if (!ws) return
+    await setSetting('workspaces', [...list.filter(w => w.name !== n), ws])
+    g.setStatus(`${t('wsSaved')}: ${n}`); setName('')
+  }
+  const load = (w: Workspace) => {
+    const api = dock.api(); if (!api) return
+    try { api.fromJSON(w.layout as never) } catch (e) { g.setStatus(String(e)); return }
+    for (const [k, v] of Object.entries(w.channelCards)) g.setChannelCard(k, v)
+    void setSetting('dockLayout', api.toJSON())
+    g.setStatus(`${t('wsLoaded')}: ${w.name}`)
+  }
+  const remove = async (w: Workspace) => {
+    if (!window.confirm(`${t('wsConfirmDelete')} — ${w.name}`)) return
+    await setSetting('workspaces', list.filter(x => x.id !== w.id))
+    g.setStatus(`${t('wsDeleted')}: ${w.name}`)
+  }
+  const exportOne = (w: Workspace) => download(`scroll-rack-workspace-${w.name.replace(/[^\w\u3400-\u9fff-]+/g, '_')}.json`, JSON.stringify({ [WS_FILE_KEY]: 1, ...w }, null, 2), 'application/json')
+  const exportCurrent = () => { const ws = snapshot(t('wsCurrent')); if (ws) exportOne(ws) }
+  const importFile = async (f: File | undefined) => {
+    if (!f) return
+    try {
+      const raw = JSON.parse(await f.text()) as Partial<Workspace> & Record<string, unknown>
+      const layout = raw.layout as { panels?: unknown } | undefined
+      if (raw[WS_FILE_KEY] !== 1 || !layout?.panels) throw new Error(t('wsBadFile'))
+      let n = String(raw.name || f.name.replace(/\.json$/i, ''))
+      while (list.some(w => w.name === n)) n += ' (2)'
+      const ws: Workspace = { id: Date.now().toString(36), name: n, savedAt: Date.now(), layout, channelCards: (raw.channelCards ?? {}) as Workspace['channelCards'] }
+      await setSetting('workspaces', [...list, ws])
+      g.setStatus(`${t('wsImported')}: ${n}`)
+    } catch (e) { g.setStatus(String(e instanceof Error ? e.message : e)) }
+  }
+  const reset = () => { const api = dock.api(); if (!api) return; defaultLayout(api, dock.seed(), dockLabels()); void setSetting('dockLayout', api.toJSON()) }
+  return (
+    <section className="opt-form">
+      <div className="opt-row">
+        <span>{t('wsSaveAs')}</span>
+        <span className="ctl"><input value={name} placeholder={t('wsName')} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void save() }} /><button className="active" disabled={!name.trim()} onClick={() => void save()}>{t('wsSave')}</button></span>
+      </div>
+      <div className="opt-row"><span>{t('wsCurrent')}</span><span className="ctl"><button onClick={exportCurrent}>{t('wsExport')}</button><button onClick={reset}>⟲ {t('wsDefault')}</button></span></div>
+      <div className="opt-row"><span>{t('wsImport')}</span><span className="ctl"><label className="row"><button onClick={e => (e.currentTarget.nextElementSibling as HTMLInputElement).click()}>{t('wsChoose')}</button><input type="file" accept="application/json" hidden onChange={e => { void importFile(e.target.files?.[0]); e.target.value = '' }} /></label></span></div>
+      <div className="opt-block">
+        <div className="opt-caption">{t('workspaces')} · {list.length}</div>
+        {sorted.length === 0 && <div className="sub">{t('wsEmpty')}</div>}
+        {sorted.length > 0 && (
+          <table className="tagtable ws-table">
+            <thead><tr><th>{t('wsName')}</th><th></th><th></th></tr></thead>
+            <tbody>
+              {sorted.map(w => (
+                <tr key={w.id}>
+                  <td className="name">{w.name}</td>
+                  <td className="sub">{new Date(w.savedAt).toLocaleString()}</td>
+                  <td className="acts"><button className="active" onClick={() => load(w)}>{t('wsLoad')}</button><button onClick={() => exportOne(w)}>{t('wsExport')}</button><button onClick={() => void remove(w)}>{t('wsDelete')}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <div className="sub opt-note">{t('wsHint')}</div>
+      </div>
+    </section>
   )
 }

@@ -1,4 +1,4 @@
-// 大學院廢墟 (mtgch.com) — documented public API (https://mtgch.com/api/v1/docs), CORS open.
+// 大学院废墟 (mtgch.com) — documented public API (https://mtgch.com/api/v1/docs), CORS open.
 // One request per set: GET /api/v1/set/{set}/cards/?unique=cards&priority_chinese=true → Chinese name / type line /
 // oracle text (HTML with mana-symbol markup) / Chinese card image (images.mtgch.com/zhs/… when the community has
 // uploaded one, else Scryfall's English scan). Keyed by Scryfall printing id, so it joins our cards table directly.

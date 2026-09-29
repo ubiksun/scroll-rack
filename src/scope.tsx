@@ -2,46 +2,60 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { DockviewApi, DockviewPanelApi } from 'dockview-react'
 import type { Card } from './db'
 import { buildNavList, hydrate, runQuery, serialize, type ScopeQuery, type SearchState, type View } from './query'
-import { asBrowse, openCard, type BrowseParams, type OpenMode } from './docks'
+import { asDock, openBlock, sameRef, type DockParams } from './docks'
 import { useCardSearch } from './hooks/useCardSearch'
 import { useGrader } from './state'
+import { t } from './i18n'
 
-// One Browse dock's private world: its query, its search, its results, its selection. The cards themselves stay in the
-// shared workspace store (useGrader) — only the QUESTION is per-dock. Because this state is local to the panel's own
-// subtree, typing in one search dock re-renders nothing in another.
+// One SEARCH dock's private world: its query, its search, its results, its SELECTION. Selection is the highlighted
+// card (single click / arrows) and changes nothing else; LOADING (double-click / Enter) pushes a card into the dock's
+// channel, which every linked image / comment / oracle dock then shows. The cards themselves stay in the shared
+// workspace store (useGrader) — only the question and the highlight are per-dock.
 export interface Scope {
   scopeId: string
   panelId: string
+  channel: string
+  linked: boolean
   q: ScopeQuery
   patch: (p: Partial<ScopeQuery>) => void
+  draft: string                          // what is typed in the box; becomes q.textF on Enter / 🔍 (an emptied box commits at once)
+  setDraft: (s: string) => void
+  submit: () => void
   filtered: Card[]
   navList: Card[]
   selIndex: number
   showPair: boolean
   selected: Card | null
-  setSelected: (c: Card | null, o?: { open?: OpenMode }) => void
+  select: (c: Card | null) => void                       // highlight only
+  load: (c: Card, o?: { newBlock?: boolean }) => void     // into the channel (or a fresh block)
+  showPairOnce: (oracleId: string) => void
   goPrev: () => void
   goNext: () => void
   searchState: SearchState
 }
 
 const Ctx = createContext<Scope | null>(null)
-export const useScope = () => { const s = useContext(Ctx); if (!s) throw new Error('useScope outside a Browse dock'); return s }
+// The slice shared components (SortMenu) need — provided by BOTH the wired and the classic ScopeProvider.
+export interface QueryScope { q: ScopeQuery; patch: (p: Partial<ScopeQuery>) => void }
+export const QueryCtx = createContext<QueryScope | null>(null)
+export const useQueryScope = () => { const s = useContext(QueryCtx); if (!s) throw new Error('useQueryScope outside a search dock'); return s }
+export const useScope = () => { const s = useContext(Ctx); if (!s) throw new Error('useScope outside a search dock'); return s }
 
-const sameParams = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 
 export function ScopeProvider({ api, containerApi, params, children }: {
   api: DockviewPanelApi
   containerApi: DockviewApi
-  params: BrowseParams
+  params: DockParams
   children: ReactNode
 }) {
   const g = useGrader()
-  const scopeId = params.scopeId
-  // params are the durable SNAPSHOT; this state is the live value. Read once on mount (a ref guards against the
-  // updateParameters round-trip feeding our own writes back in as "new" props).
+  const scopeId = params.scopeId ?? 'main'
+  const channel = api.id       // a search dock IS its channel
+  const linked = true
   const seeded = useRef(false)
   const [q, setQ] = useState<ScopeQuery>(() => hydrate(params.q))
+  const [draft, setDraftState] = useState(() => hydrate(params.q).textF)
   const [sel, setSel] = useState<Card | null>(null)
   const [pairOnce, setPairOnce] = useState<string | null>(null)
 
@@ -58,7 +72,7 @@ export function ScopeProvider({ api, containerApi, params, children }: {
     const p = g.partnerOf.get(sel.oracleId); return p ? navList.findIndex(c => c.oracleId === p) : -1
   }, [sel, navList, g.pairMode, g.partnerOf])
 
-  // restore the dock's remembered card once the card table has loaded
+  // restore the dock's remembered selection once the card table has loaded
   useEffect(() => {
     if (seeded.current || !params.sel) { seeded.current = true; return }
     const c = g.cardByKey.get(`${params.sel.set}:${params.sel.oracleId}`)
@@ -66,45 +80,54 @@ export function ScopeProvider({ api, containerApi, params, children }: {
   }, [g.cardByKey])
 
   const showPair = !!sel && !!g.partnerOf.get(sel.oracleId) && (g.pairMode || pairOnce === sel.oracleId || pairOnce === g.partnerOf.get(sel.oracleId))
-
   const patch = useCallback((p: Partial<ScopeQuery>) => setQ(prev => ({ ...prev, ...p })), [])
+  const setDraft = useCallback((s: string) => { setDraftState(s); if (!s.trim()) setQ(prev => (prev.textF ? { ...prev, textF: '' } : prev)) }, [])
+  const submit = useCallback(() => setQ(prev => (prev.textF === draft ? prev : { ...prev, textF: draft })), [draft])
+  const select = useCallback((c: Card | null) => setSel(c), [])
 
-  const setSelected = useCallback((c: Card | null, o?: { open?: OpenMode }) => {
+  const labels = useCallback(() => ({ search: t('zoneSearch'), image: t('zoneImage'), comment: t('zoneComment'), oracle: t('zoneOracle'), graph: t('zoneGraph') }), [])
+  const load = useCallback((c: Card, o?: { newBlock?: boolean }) => {
     setSel(c)
-    if (!c || !o?.open) return
-    const id = openCard(containerApi, c, { mode: o.open, scopeId, title: g.nameOf(c), oracleMode: g.oracleMode })
-    // coherence: "the card I'm rating" always follows the last dock a click or arrow key actually drove
-    if (id) g.setActiveCardPanel(id)
-  }, [containerApi, scopeId, g.nameOf, g.oracleMode, g.setActiveCardPanel])
+    const ref = { set: c.set, oracleId: c.oracleId }
+    // a block of its own (image + comments frozen on this card) comes from the + Panel menu, never from a modifier
+    if (o?.newBlock) { openBlock(containerApi, labels(), { own: ref, refId: api.id, placement: 'right' }); return }
+    g.setChannelCard(channel, ref)
+  }, [channel, containerApi, api, g.setChannelCard, labels])
 
-  const goPrev = useCallback(() => { const i = selIndex < 0 ? 0 : selIndex - 1; if (i >= 0 && i < navList.length) setSelected(navList[i], { open: 'primary' }) }, [selIndex, navList, setSelected])
-  const goNext = useCallback(() => { const i = selIndex < 0 ? 0 : selIndex + 1; if (i >= 0 && i < navList.length) setSelected(navList[i], { open: 'primary' }) }, [selIndex, navList, setSelected])
-
-  // Card view always shows something from the current filter: if the selection fell out of it, jump to the first entry
-  useEffect(() => { if (q.view === 'single' && navList.length && selIndex < 0) setSel(navList[0]) }, [q.view, navList, selIndex])
+  // arrows move the highlight; from a follower dock the shell steps AND loads (see loadStep below)
+  const goPrev = useCallback(() => { const i = selIndex < 0 ? 0 : selIndex - 1; if (i >= 0 && i < navList.length) setSel(navList[i]) }, [selIndex, navList])
+  const goNext = useCallback(() => { const i = selIndex < 0 ? 0 : selIndex + 1; if (i >= 0 && i < navList.length) setSel(navList[i]) }, [selIndex, navList])
+  // step relative to the card the channel currently shows (what an image dock's ← → mean), then load it
+  const loadStep = useCallback((delta: number) => {
+    if (!navList.length) return
+    const cur = g.channelCards[channel]
+    const at = cur ? navList.findIndex(c => sameRef(c, cur)) : selIndex
+    const i = at < 0 ? 0 : at + delta
+    if (i >= 0 && i < navList.length) load(navList[i])
+  }, [navList, g.channelCards, channel, selIndex, load])
+  const loadSelected = useCallback(() => { if (sel) load(sel) }, [sel, load])
 
   // mirror the live value back into params (debounced) so `dockLayout` restores this dock exactly as it is.
-  // The deep-equality guard is mandatory: updateParameters → onDidParametersChange → re-render → effect would loop.
+  // Merge, never replace: channel / linked / pinned belong to the tab header. The equality guard is mandatory.
   const mirror = useCallback(() => {
-    // updateParameters REPLACES, so carry forward anything this component does not own (pinned, title, …)
-    const next = { ...api.getParameters(), kind: 'browse', scopeId, q: serialize(q), sel: sel ? { set: sel.set, oracleId: sel.oracleId } : null } as unknown as BrowseParams
-    if (!sameParams(asBrowse(next as unknown as Record<string, unknown>), asBrowse(api.getParameters()))) {
-      api.updateParameters(next as unknown as Record<string, unknown>)
-    }
+    const cur = api.getParameters() as Record<string, unknown>
+    const next = { ...cur, kind: 'search', channel, linked: true, scopeId, q: serialize(q), sel: sel ? { set: sel.set, oracleId: sel.oracleId } : null }
+    const a = asDock(next), b = asDock(cur)
+    if (!same([a.q, a.sel, a.channel], [b.q, b.sel, b.channel])) api.updateParameters(next)
   }, [api, scopeId, q, sel])
   useEffect(() => {
     const h = window.setTimeout(mirror, 400)
-    return () => { window.clearTimeout(h); mirror() }   // flush on unmount too — docked tabs unmount when hidden
+    return () => { window.clearTimeout(h); try { mirror() } catch { /* dock already closed */ } }
   }, [mirror])
 
-
-  // publish a handle for the shell's keyboard handler and the export menu (a ref map — never re-renders anyone)
   const value: Scope = {
-    scopeId, panelId: api.id, q, patch, filtered, navList, selIndex, showPair, selected: sel, setSelected, goPrev, goNext, searchState,
+    scopeId, panelId: api.id, channel, linked, q, patch, draft, setDraft, submit, filtered, navList, selIndex, showPair, selected: sel, select, load,
+    showPairOnce: setPairOnce, goPrev, goNext, searchState,
   }
-  g.registerNav(scopeId, { goPrev, goNext, setView: v => patch({ view: v }), showPairOnce: setPairOnce, view: q.view, selected: sel, filtered, tierF: q.tierF })
+  // publish a handle for the shell's keyboard handler, the image dock's ← →, and the export menu (a ref map)
+  g.registerNav(scopeId, { channel, linked, goPrev, goNext, loadStep, loadSelected, setView: v => patch({ view: v }), showPairOnce: setPairOnce, view: q.view, selected: sel, filtered, tierF: q.tierF })
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={value}><QueryCtx.Provider value={value}>{children}</QueryCtx.Provider></Ctx.Provider>
 }
 
 export type { View }

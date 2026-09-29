@@ -4,6 +4,8 @@ import { pct } from '../api/seventeen'
 import { FEATURES } from '../features'
 import { t } from '../i18n'
 import ArtPicker from './ArtPicker'
+import { searchCards } from '../api/scryfall'
+import { hasCardDrag } from '../dnd'
 
 // Fixed sections + one collapsible block per rating context (each with tiers + its own note).
 export const PANEL_SECTIONS = ['image', 'contexts', 'tags', 'links', 'oracle', 'community'] as const
@@ -22,7 +24,7 @@ interface Props {
   cardsByOracle: Map<string, Card>
   community: { row: CommunityRow | undefined; percentile: number | undefined; fetchedAt?: number; onRefresh: () => void } | null
   onJump: (oracleId: string) => void
-  onClose: () => void
+  onClose?: () => void                // when given, a ✕ next to the name
   image: string
   artPref: ArtPref | undefined
   artMode: ArtMode
@@ -36,7 +38,7 @@ interface Props {
   hideImage?: boolean                 // Card view: the big image is on the left already
   communityTags?: CommunityTagsRow | null   // Scryfall Tagger (experimental); undefined = feature off
   onRefreshCommunity?: () => void
-  display?: { name: string; type: string; original?: string }   // localized name/type (大學院廢墟); original = English name when different
+  display?: { name: string; type: string; original?: string }   // localized name/type (大学院废墟); original = English name when different
   pair?: { partner: Card; partnerName?: string; setting: 'auto' | 'off' | undefined; onSetSetting: (v: 'auto' | 'off') => void; onShowOnce: () => void; onJump: () => void }
 }
 
@@ -52,9 +54,9 @@ function ContextBlock({ uid, card, ctx, scheme, rating, open, onToggle, onDropCt
   const tier = scheme?.tiers.find(x => x.name === rating?.tier)
   return (
     <div className={`block${dropSide}`}
-      onDragOver={e => { e.preventDefault(); onOverCtx(ctx.id) }}
+      onDragOver={e => { if (hasCardDrag(e)) return; e.preventDefault(); onOverCtx(ctx.id) }}
       onDragLeave={() => onOverCtx(null)}
-      onDrop={e => { e.preventDefault(); e.stopPropagation(); onOverCtx(null); onDragCtx(null); const from = e.dataTransfer.getData('text/context'); if (from && from !== ctx.id) onDropCtx(from) }}>
+      onDrop={e => { if (hasCardDrag(e)) return; e.preventDefault(); e.stopPropagation(); onOverCtx(null); onDragCtx(null); const from = e.dataTransfer.getData('text/context'); if (from && from !== ctx.id) onDropCtx(from) }}>
       <div className="block-head draggable" draggable onClick={onToggle}
         onDragStart={e => { e.stopPropagation(); onDragCtx(ctx.id); e.dataTransfer.setData('text/context', ctx.id); e.dataTransfer.effectAllowed = 'move' }}
         onDragEnd={() => { onDragCtx(null); onOverCtx(null) }}
@@ -93,14 +95,28 @@ export default function CardPanel(p: Props) {
   const [dragCtx, setDragCtx] = useState<string | null>(null)
   const [overCtx, setOverCtx] = useState<string | null>(null)
   useEffect(() => { setQ(''); setEdgeNote(''); setTagQ(''); setEdgeTagQ({}) }, [card.id])
+  // 3+ letters (not CJK) also ask Scryfall, so a link can point at a card no loaded set contains; hits are cached
+  // into db.cards by searchCards, which is what lets the edge resolve to a name afterwards.
+  const [remote, setRemote] = useState<Card[]>([])
+  useEffect(() => {
+    const s = q.trim()
+    setRemote([])
+    if (s.length < 3 || /[\u3400-\u9fff]/.test(s)) return
+    const ctrl = new AbortController()
+    const h = setTimeout(async () => { try { setRemote(await searchCards(s, 1, ctrl.signal)) } catch { /* offline or no match */ } }, 450)
+    return () => { clearTimeout(h); ctrl.abort() }
+  }, [q])
   const allEdgeTags = useMemo(() => [...new Set(edges.flatMap(e => e.tags))].sort(), [edges])
 
   const results = useMemo(() => {
     const s = q.trim().toLowerCase()
     if (s.length < 2) return []
     const linked = new Set(edges.map(e => (e.a === card.oracleId ? e.b : e.a)))
-    return allCards.filter(c => c.oracleId !== card.oracleId && !linked.has(c.oracleId) && c.name.toLowerCase().includes(s)).slice(0, 12)
-  }, [q, allCards, edges, card.oracleId])
+    const local = allCards.filter(c => c.oracleId !== card.oracleId && !linked.has(c.oracleId) && c.name.toLowerCase().includes(s))
+    const seen = new Set(local.map(c => c.oracleId))
+    const extra = remote.filter(c => c.oracleId !== card.oracleId && !linked.has(c.oracleId) && !seen.has(c.oracleId))
+    return [...local, ...extra].slice(0, 12)
+  }, [q, allCards, remote, edges, card.oracleId])
   const tagSuggestions = useMemo(() => {
     const s = tagQ.trim().toLowerCase(); const have = new Set(tags.map(x => x.tag))
     return allTags.filter(x => !have.has(x) && (!s || x.includes(s))).slice(0, 8)
@@ -135,20 +151,23 @@ export default function CardPanel(p: Props) {
     </div>
   )
 
-  // Sections are user-resizable. An explicit full-width grip at the bottom rather than the native CSS `resize`
+  // Sections are user-resizable. The stored size is a MAX height: content shorter than it (a collapsed dimension)
+  // gives the space back immediately instead of leaving a blank band.
+  // An explicit full-width grip at the bottom rather than the native CSS `resize`
   // corner: a section taller than the panel puts that corner outside the scroll viewport, where it can never be
   // grabbed. Drag the grip; ⤢ in the header clears the stored height and goes back to fitting the content.
   const box = (id: SectionId, children: React.ReactNode) => {
-    const h = heights[id]
+    const h = collapsed.has(id) ? undefined : heights[id]   // a collapsed section gives its space back
     // live drop indicator: the target shows a line on the side the dragged section will land on
     const dropSide = dragSec && overSec === id && dragSec !== id
       ? (sections.indexOf(dragSec) < sections.indexOf(id) ? ' drop-after' : ' drop-before')
       : ''
     return (
-      <div className={`section sizable${h ? ' sized' : ''}${dropSide}`} key={id} style={h ? { height: h } : undefined}
-        onDragOver={e => { e.preventDefault(); if (overSec !== id) setOverSec(id) }}
+      <div className={`section sizable${h ? ' sized' : ''}${dropSide}`} key={id} style={h ? { maxHeight: h } : undefined}
+        onDragOver={e => { if (hasCardDrag(e)) return; e.preventDefault(); if (overSec !== id) setOverSec(id) }}
         onDragLeave={() => setOverSec(cur => (cur === id ? null : cur))}
         onDrop={e => {
+          if (hasCardDrag(e)) return   // a card drop belongs to the comments zone (link), not to section reordering
           e.preventDefault(); setOverSec(null); setDragSec(null)
           const from = e.dataTransfer.getData('text/section') as SectionId
           if (from && from !== id) onReorderSection(from, sections.indexOf(id))
@@ -248,7 +267,7 @@ export default function CardPanel(p: Props) {
               </div>
               <span className="typeahead block">
                 <input placeholder={t('linkTo')} value={q} onChange={e => setQ(e.target.value)} style={{ width: '100%', marginTop: 6 }} />
-                {results.length > 0 && <div className="search-results">{results.map(c => <div key={c.id} onClick={() => addEdge(c)}>{c.name} <span className="sub">({c.set.toUpperCase()})</span></div>)}</div>}
+                {results.length > 0 && <div className="search-results">{results.map(c => <div key={c.id} onClick={() => addEdge(c)}>{c.name} <span className="sub">({c.set.toUpperCase()}{remote.includes(c) ? ' · 🌐' : ''})</span></div>)}</div>}
               </span>
             </>}
           </>
@@ -290,23 +309,23 @@ export default function CardPanel(p: Props) {
     <div>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h2>{display?.name ?? card.name}{display?.original && <span className="sub orig"> {display.original}</span>}</h2>
-        <button onClick={onClose}>✕</button>
+        {onClose && <button onClick={onClose}>✕</button>}
       </div>
       <div className="sub">{card.manaCost} · {display?.type ?? card.typeLine} · {card.rarity} · {card.set.toUpperCase()} #{card.collectorNumber} · <a href={card.scryfallUri} target="_blank" rel="noreferrer">Scryfall</a></div>
       {pair && (
         <div className="pairbar">
           <button className="pairbtn" onClick={() => { if (pair.setting === undefined) setAskPair(true); else if (pair.setting === 'auto') pair.onJump(); else pair.onShowOnce() }} title={pair.setting === 'auto' ? 'jump to the other half' : 'show both halves side by side'}>
-            <img src={pair.partner.imageSmall || pair.partner.imageNormal} alt="" /> ⇆ Echoverse pair · {pair.partnerName ?? pair.partner.name}
+            <img src={pair.partner.imageSmall || pair.partner.imageNormal} alt="" /> ⇆ {t('pairLabel')} · {pair.partnerName ?? pair.partner.name}
           </button>
           {askPair && (
             <div className="pairask">
-              <div><b>Echoverse pairs</b> — FRA prints every legend from #195 up twice, once per universe. Show both halves side by side automatically whenever you open one of them?</div>
+              <div><b>{t('pairAskTitle')}</b> — {t('pairAskBody')}</div>
               <div className="row" style={{ marginTop: 6 }}>
-                <button className="active" onClick={() => { pair.onSetSetting('auto'); setAskPair(false) }}>Always</button>
-                <button onClick={() => { pair.onShowOnce(); setAskPair(false) }}>Just this once</button>
-                <button onClick={() => { pair.onSetSetting('off'); pair.onJump(); setAskPair(false) }}>No, just jump to it</button>
+                <button className="active" onClick={() => { pair.onSetSetting('auto'); setAskPair(false) }}>{t('pairAlways')}</button>
+                <button onClick={() => { pair.onShowOnce(); setAskPair(false) }}>{t('pairOnce')}</button>
+                <button onClick={() => { pair.onSetSetting('off'); pair.onJump(); setAskPair(false) }}>{t('pairJump')}</button>
               </div>
-              <div className="sub" style={{ marginTop: 4 }}>Change later in ⚙ Options → Echoverse pairs.</div>
+              <div className="sub" style={{ marginTop: 4 }}>{t('pairChangeLater')}</div>
             </div>
           )}
         </div>
@@ -320,9 +339,9 @@ export default function CardPanel(p: Props) {
           const startY = e.clientY
           const startH = sec.getBoundingClientRect().height
           // pin the height and clip straight away, or the content just overflows and the drag looks like it lags
-          sec.style.height = `${Math.round(startH)}px`
+          sec.style.maxHeight = `${Math.round(startH)}px`
           sec.classList.add('sized', 'resizing')
-          const move = (ev: PointerEvent) => { sec.style.height = `${Math.max(64, Math.round(startH + ev.clientY - startY))}px` }
+          const move = (ev: PointerEvent) => { sec.style.maxHeight = `${Math.max(64, Math.round(startH + ev.clientY - startY))}px` }
           const up = () => {
             document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up)
             sec.classList.remove('resizing')

@@ -102,7 +102,7 @@ export interface CommunityRow {
 
 export interface Setting { key: string; value: unknown }
 
-// 大學院廢墟 Chinese layer, per printing id (joins cards.id). image = mtgch zhs scan when one exists.
+// 大学院废墟 Chinese layer, per printing id (joins cards.id). image = mtgch zhs scan when one exists.
 export interface ZhCard { id: string; set: string; oracleId: string; collectorNumber: string; name: string; typeLine: string; text: string; flavor: string; image: string; backName: string; backText: string; fetchedAt: number }
 
 // Scryfall Tagger community data, cached per oracle_id (experimental feature).
@@ -241,17 +241,37 @@ export function applyBadgePrefs<T extends { ctxId: string }>(badges: T[], prefs:
 // ---- edges ----
 export const edgeKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`)
 export const normTag = (t: string) => t.trim().toLowerCase().replace(/^#/, '')
+// An edge is unordered: (a,b) and (b,a) are the same link. The old dedup chained Dexie's .or().and() so the second
+// filter applied to BOTH branches — same-direction duplicates slipped through and a card could list a link twice.
+export const findEdge = (a: string, b: string) => db.edges.filter(e => (e.a === a && e.b === b) || (e.a === b && e.b === a)).first()
 export async function addEdge(a: string, b: string, note = '', source: EdgeSource = 'manual') {
-  const dup = await db.edges.where('a').equals(a).and(e => e.b === b).or('a').equals(b).and(e => e.b === a).first()
+  const dup = await findEdge(a, b)
   if (dup) return dup.id!
   return db.edges.add({ a, b, tags: [], note, source, createdAt: Date.now() }) as Promise<number>
+}
+// One-time repair for duplicates the old dedup let in: keep the oldest edge, union the tags, keep the first note.
+export async function dedupeEdges(): Promise<number> {
+  const all = (await db.edges.toArray()).sort((x, y) => x.createdAt - y.createdAt)
+  const seen = new Map<string, Edge>()
+  const drop: number[] = []
+  for (const e of all) {
+    const k = [e.a, e.b].sort().join('|')
+    const keep = seen.get(k)
+    if (!keep) { seen.set(k, e); continue }
+    const tags = [...new Set([...keep.tags, ...e.tags])]
+    if (tags.length !== keep.tags.length || (!keep.note && e.note)) await db.edges.update(keep.id!, { tags, note: keep.note || e.note })
+    drop.push(e.id!)
+  }
+  if (drop.length) await db.edges.bulkDelete(drop)
+  return drop.length
 }
 export const COUNTERPART_TAG = 'counterpart'
 
 // FRA "Echoverse pairs": every legendary from #195 up has a parallel-universe twin. Scryfall marks one side with
 // watermark 'echoverse' (a few with 'desparked'), but has no explicit link, so we pair by:
 //   1. shared significant name token (Chandra ↔ Chandra, Rescue Girl ↔ Massacre Girl, Geist of Saint Thalia ↔ Thalia)
-//   2. "Way of the …" enchantments: by colour identity (the watermark is missing on some of these)
+//   2. "Way of the …" enchantments: an explicit collector-number table — the twins are NOT same-colour
+//      (Healer #207 ↔ Necromancer #239, user-verified 2026-09-28), so no heuristic pairs them right
 //   3. a short alias table for the rest (Titanbones ↔ Tinybones)
 // Only unambiguous matches become edges (source 'set', tag #counterpart). Left unpaired: Codie (#168), Jace (#216), Tam (#276).
 const STOP = new Set(['the', 'of', 'and', 'saint', 'first', 'most', 'reality', 'sculptor'])
@@ -259,6 +279,8 @@ const tokens = (n: string) => n.toLowerCase().replace(/'s\b/g, '').split(/[^a-z]
 const FRA_ALIASES: [string, string][] = [
   ['Titanbones, Towering Heart', 'Tinybones, Pocket Nuisance'],
 ]
+// collector-number pairs (FRA only): the five "Way of the …" twins
+const FRA_NUMBER_PAIRS: [string, string][] = [['207', '239'], ['208', '255'], ['223', '254'], ['224', '267'], ['238', '268']]
 export async function autoPairCounterparts(set: string): Promise<number> {
   const cards = await db.cards.where('set').equals(set).toArray()
   // drop set-derived pairs from a previous (possibly wrong) run before recomputing
@@ -270,11 +292,14 @@ export async function autoPairCounterparts(set: string): Promise<number> {
   const pairs: [Card, Card][] = []
   const used = new Set<string>()
   const take = (a: Card | undefined, b: Card | undefined) => { if (a && b && a.oracleId !== b.oracleId && !used.has(a.oracleId) && !used.has(b.oracleId)) { pairs.push([a, b]); used.add(a.oracleId); used.add(b.oracleId) } }
-  // 3. aliases first (explicit beats heuristic)
+  // 3 + 2. explicit tables first (explicit beats heuristic)
   for (const [x, y] of FRA_ALIASES) take(byName.get(x), byName.get(y))
-  // 2. Way of the … by colour
-  const ways = legends.filter(c => /^Way of the /.test(c.name))
-  for (const w of ways) { if (used.has(w.oracleId)) continue; const m = ways.filter(o => o !== w && !used.has(o.oracleId) && o.colorIdentity.join() === w.colorIdentity.join()); if (m.length === 1) take(w, m[0]) }
+  if (set === 'fra') {
+    const byNum = new Map(cards.map(c => [c.collectorNumber, c]))
+    for (const [x, y] of FRA_NUMBER_PAIRS) take(byNum.get(x), byNum.get(y))
+  }
+  // Way of the … never falls through to the name heuristic (their names share no token anyway)
+  for (const w of legends) if (/^Way of the /.test(w.name)) used.add(w.oracleId)
   // 1. echoverse ↔ non-echoverse by shared name token
   const echo = legends.filter(c => c.watermark === 'echoverse' && !used.has(c.oracleId))
   const others = legends.filter(c => c.watermark !== 'echoverse')
