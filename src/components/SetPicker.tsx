@@ -51,7 +51,7 @@ export default function SetPicker({ local, active, onToggle, onPull, onPullMany,
   let lastTier: Tier | null = null
   return (
     <span className="menu-wrap" ref={wrap}>
-      <button onClick={() => setOpen(v => !v)}>{label} ▾</button>
+      <button data-tour="sets" onClick={() => setOpen(v => !v)}>{label} ▾</button>
       {open && (
         <div className="menu setmenu">
           <input autoFocus placeholder="filter sets…" value={q} onChange={e => setQ(e.target.value)} />

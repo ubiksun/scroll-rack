@@ -147,8 +147,9 @@ export function GraderProvider({ children }: { children: ReactNode }) {
       setSections([...saved.filter(s => PANEL_SECTIONS.includes(s)), ...PANEL_SECTIONS.filter(s => !saved.includes(s))])
       setCollapsed(new Set(await getSetting<string[]>('collapsed', [])))
       setSectionHeights(await getSetting<Record<string, number>>('cardSectionHeights', {}))
-      const l = await getSetting<Lang>('lang', 'en'); setI18n(l); setLangState(l); document.title = t('appName')
-      setCardLangState(await getSetting<Lang>('cardLang', 'en'))
+      const browserZh: Lang = /^zh/i.test(navigator.language) ? 'zh' : 'en'   // first run follows the browser; the setting wins afterwards
+      const l = await getSetting<Lang>('lang', browserZh); setI18n(l); setLangState(l); document.title = t('appName')
+      setCardLangState(await getSetting<Lang>('cardLang', browserZh))
       setOracleLangState(await getSetting<OracleLang>('oracleLang', 'follow'))
       setNewTabPlacement(await getSetting<TabPlacement>('newTabPlacement', 'right'))
       setLinkStyle(await getSetting<LinkStyle>('linkStyle', 'wire'))

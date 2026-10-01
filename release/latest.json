@@ -1,6 +1,6 @@
 {
-  "version": "0.10.0",
-  "zip": "https://github.com/ubiksun/scroll-rack/releases/download/v0.10.0/scroll-rack-v0.10.0.zip",
-  "notes": "Multi-dock workspace: several search panels each with its own query, several card panels at once, rebuilt Options, sharper card images",
-  "date": "2026-09-22"
+  "version": "0.14.0",
+  "zip": "https://github.com/ubiksun/scroll-rack/releases/download/v0.14.0/scroll-rack-v0.14.0.zip",
+  "notes": "首次使用引导;搜索改为 Enter 执行;单击选中、双击打开、右键规则文字;拖卡建立连结;工作区保存;界面简体中文",
+  "date": "2026-10-01"
 }

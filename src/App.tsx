@@ -13,7 +13,7 @@ import DockTab from './components/DockTab'
 import SetPicker from './components/SetPicker'
 import OptionsModal from './components/OptionsModal'
 import OraclePopover from './components/OraclePopover'
-import OnboardingGuide from './components/OnboardingGuide'
+import CoachTour from './components/CoachTour'
 import ClassicShell from './classic/App'
 import { DOCK_COMPONENTS } from './panels/TabPanel'
 import { checkForUpdate, currentVersion, type LatestInfo } from './update'
@@ -144,7 +144,7 @@ function WiredShell({ dockRef, openOptions }: { dockRef: MutableRefObject<Dockvi
             )}
           </span>
           <label className="row"><button onClick={e => (e.currentTarget.nextElementSibling as HTMLInputElement).click()} title="Merge a JSON backup from another machine">{t('import')}</button><input type="file" accept="application/json" hidden onChange={e => doImport(e.target.files?.[0])} /></label>
-          <button className="gear" onClick={openOptions} title="Options / 设定" aria-label="Options"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button className="gear" data-tour="gear" onClick={openOptions} title="Options / 设定" aria-label="Options"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
       </div>
 
@@ -165,21 +165,21 @@ function WiredShell({ dockRef, openOptions }: { dockRef: MutableRefObject<Dockvi
         <span>{g.activeSets.length ? `${g.activeSets.map(s => s.toUpperCase()).join(' + ')} · ${g.cards.length} cards · ${g.ratedCount} rated · ${g.edges.length} links · ${g.allTagRows.length} tags` : ''}</span>
       </div>
 
-      <OraclePopover />
     </div>
   )
 }
 
-// The shell is picked by the workspace-mode setting (🧪 in the top bar). The options modal and the first-run guide
+// The shell is picked by the workspace-mode setting (⚙ Experimental). The options modal and the first-run tour
 // sit above both, sharing the dock api of whichever shell is mounted.
 function Root() {
   const g = useGrader()
   const dockRef = useRef<DockviewApi | null>(null)
   const [options, setOptions] = useState(false)
   const [guide, setGuide] = useState(false)
+  const [guideAt, setGuideAt] = useState(0)
   const onboarded = useLiveQuery(() => getSetting<boolean>('onboarded', false), [])
   useEffect(() => { if (onboarded === false) setGuide(true) }, [onboarded])
-  useEffect(() => { const open = () => setGuide(true); window.addEventListener('sr:guide', open); return () => window.removeEventListener('sr:guide', open) }, [])
+  useEffect(() => { const open = (e: Event) => { setGuideAt(typeof (e as CustomEvent).detail === 'number' ? (e as CustomEvent).detail : 0); setGuide(true) }; window.addEventListener('sr:guide', open); return () => window.removeEventListener('sr:guide', open) }, [])
   if (!g.ready) return null
   const seed = (): SerializedQuery => DEFAULT_QUERY
   return (
@@ -187,8 +187,9 @@ function Root() {
       {g.workspaceMode === 'wired'
         ? <WiredShell key="wired" dockRef={dockRef} openOptions={() => setOptions(true)} />
         : <ClassicShell key="classic" dockRef={dockRef} openOptions={() => setOptions(true)} />}
+      <OraclePopover />
       {options && <OptionsModal contexts={g.contexts} schemes={g.schemes} dock={{ api: () => dockRef.current, seed }} onClose={() => setOptions(false)} />}
-      {guide && <OnboardingGuide onClose={() => setGuide(false)} />}
+      <CoachTour open={guide} startAt={guideAt} onClose={() => setGuide(false)} />
     </>
   )
 }

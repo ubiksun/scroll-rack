@@ -43,7 +43,7 @@ interface Props {
 }
 
 
-function ContextBlock({ uid, card, ctx, scheme, rating, open, onToggle, onDropCtx, dropSide, onDragCtx, onOverCtx }: { uid: (s: string) => string; card: Card; ctx: Context; scheme: Scheme | undefined; rating: Rating | undefined; open: boolean; onToggle: () => void; onDropCtx: (fromId: string) => void; dropSide: string; onDragCtx: (id: string | null) => void; onOverCtx: (id: string | null) => void }) {
+function ContextBlock({ uid, card, ctx, scheme, rating, open, onToggle, onDropCtx, dropSide, onDragCtx, onOverCtx, first }: { first?: boolean; uid: (s: string) => string; card: Card; ctx: Context; scheme: Scheme | undefined; rating: Rating | undefined; open: boolean; onToggle: () => void; onDropCtx: (fromId: string) => void; dropSide: string; onDragCtx: (id: string | null) => void; onOverCtx: (id: string | null) => void }) {
   const [note, setNote] = useState(rating?.note ?? '')
   useEffect(() => { setNote(rating?.note ?? '') }, [card.id, ctx.id])
   useEffect(() => {
@@ -53,7 +53,7 @@ function ContextBlock({ uid, card, ctx, scheme, rating, open, onToggle, onDropCt
   }, [note])
   const tier = scheme?.tiers.find(x => x.name === rating?.tier)
   return (
-    <div className={`block${dropSide}`}
+    <div className={`block${dropSide}`} data-tour={first ? 'tiers' : undefined}
       onDragOver={e => { if (hasCardDrag(e)) return; e.preventDefault(); onOverCtx(ctx.id) }}
       onDragLeave={() => onOverCtx(null)}
       onDrop={e => { if (hasCardDrag(e)) return; e.preventDefault(); e.stopPropagation(); onOverCtx(null); onDragCtx(null); const from = e.dataTransfer.getData('text/context'); if (from && from !== ctx.id) onDropCtx(from) }}>
@@ -90,11 +90,13 @@ export default function CardPanel(p: Props) {
   const [tagQ, setTagQ] = useState('')
   const [edgeNote, setEdgeNote] = useState('')
   const [edgeTagQ, setEdgeTagQ] = useState<Record<number, string>>({})
+  const [hi, setHi] = useState(0)                                     // highlighted row of the link typeahead
   const [dragSec, setDragSec] = useState<SectionId | null>(null)      // section being dragged
   const [overSec, setOverSec] = useState<SectionId | null>(null)      // section it is hovering over
   const [dragCtx, setDragCtx] = useState<string | null>(null)
   const [overCtx, setOverCtx] = useState<string | null>(null)
   useEffect(() => { setQ(''); setEdgeNote(''); setTagQ(''); setEdgeTagQ({}) }, [card.id])
+  useEffect(() => { setHi(0) }, [q])
   // 3+ letters (not CJK) also ask Scryfall, so a link can point at a card no loaded set contains; hits are cached
   // into db.cards by searchCards, which is what lets the edge resolve to a name afterwards.
   const [remote, setRemote] = useState<Card[]>([])
@@ -163,7 +165,7 @@ export default function CardPanel(p: Props) {
       ? (sections.indexOf(dragSec) < sections.indexOf(id) ? ' drop-after' : ' drop-before')
       : ''
     return (
-      <div className={`section sizable${h ? ' sized' : ''}${dropSide}`} key={id} style={h ? { maxHeight: h } : undefined}
+      <div className={`section sizable${h ? ' sized' : ''}${dropSide}`} key={id} data-tour={id === 'tags' ? 'tags' : id === 'links' ? 'links' : undefined} style={h ? ({ maxHeight: h, '--sec-h': `${h}px` } as React.CSSProperties) : undefined}
         onDragOver={e => { if (hasCardDrag(e)) return; e.preventDefault(); if (overSec !== id) setOverSec(id) }}
         onDragLeave={() => setOverSec(cur => (cur === id ? null : cur))}
         onDrop={e => {
@@ -184,7 +186,22 @@ export default function CardPanel(p: Props) {
         return box(id, (
           <>
             {head(id, t('imageSection'))}
-            {!collapsed.has(id) && <ArtPicker card={card} src={image} className="big" artPref={artPref} artMode={artMode} onSetArt={onSetArt} />}
+            {!collapsed.has(id) && (() => {
+              // The image never grows past a card's natural width: a narrower panel shrinks it, a wider panel leaves
+              // room beside it, and that room shows the linked cards (same strip as the wired Image panel).
+              const linked = edges.map(e => ({ e, c: cardsByOracle.get(e.a === card.oracleId ? e.b : e.a) })).filter((x): x is { e: Edge; c: Card } => !!x.c)
+              return (
+                <div className="img-row">
+                  <div className="img-main"><ArtPicker card={card} src={image} className="big" artPref={artPref} artMode={artMode} onSetArt={onSetArt} /></div>
+                  {linked.length > 0 && (
+                    <div className="link-strip">
+                      <div className="sub">⇆ {t('links')} ({linked.length})</div>
+                      {linked.map(({ e, c }) => <img key={e.id} src={c.imageSmall || c.imageNormal} alt={c.name} title={c.name} onDoubleClick={() => onJump(c.oracleId)} />)}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </>
         ))
       case 'contexts':
@@ -192,7 +209,7 @@ export default function CardPanel(p: Props) {
           <>
             {head(id, t('ratingsSection'))}
             {!collapsed.has(id) && contexts.map((ctx, i) => (
-              <ContextBlock key={ctx.id} uid={uid} card={card} ctx={ctx} scheme={schemes.find(s => s.id === ctx.schemeId)} rating={ratings.find(r => r.context === ctx.id)}
+              <ContextBlock key={ctx.id} first={i === 0} uid={uid} card={card} ctx={ctx} scheme={schemes.find(s => s.id === ctx.schemeId)} rating={ratings.find(r => r.context === ctx.id)}
                 open={!collapsed.has(ctx.id)} onToggle={() => onToggleCollapse(ctx.id)}
                 onDropCtx={from => reorderContext(from, i)}
                 dropSide={dragCtx && overCtx === ctx.id && dragCtx !== ctx.id
@@ -266,8 +283,19 @@ export default function CardPanel(p: Props) {
                 <input placeholder={t('why')} value={edgeNote} onChange={e => setEdgeNote(e.target.value)} style={{ flex: 1 }} />
               </div>
               <span className="typeahead block">
-                <input placeholder={t('linkTo')} value={q} onChange={e => setQ(e.target.value)} style={{ width: '100%', marginTop: 6 }} />
-                {results.length > 0 && <div className="search-results">{results.map(c => <div key={c.id} onClick={() => addEdge(c)}>{c.name} <span className="sub">({c.set.toUpperCase()}{remote.includes(c) ? ' · 🌐' : ''})</span></div>)}</div>}
+                <input placeholder={t('linkTo')} value={q} onChange={e => setQ(e.target.value)} style={{ width: '100%', marginTop: 6 }}
+                  onKeyDown={e => {
+                    if (e.key === 'ArrowDown') { e.preventDefault(); setHi(h => Math.min(h + 1, results.length - 1)) }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi(h => Math.max(h - 1, 0)) }
+                    else if (e.key === 'Enter' && results[hi]) { e.preventDefault(); void addEdge(results[hi]) }
+                    else if (e.key === 'Escape') setQ('')
+                  }} />
+                {results.length > 0 && (
+                  <div className="search-results link-results">
+                    {results.map((c, k) => <div key={c.id} className={k === hi ? 'hi' : ''} onMouseEnter={() => setHi(k)} onClick={() => addEdge(c)}>{c.name} <span className="sub">[{c.set.toUpperCase()}]{remote.includes(c) ? ' 🌐' : ''}</span></div>)}
+                    <div className="sub hint">{t('linkEnterHint')}</div>
+                  </div>
+                )}
               </span>
             </>}
           </>

@@ -24,15 +24,15 @@ const path = require('path'), fs = require('fs'), os = require('os');
     app.on('pageerror', e => errors.push('app: ' + e.message));
     await app.goto(`chrome-extension://${id}/index.html`); await app.waitForTimeout(1500);
     out.version = await app.locator('.statusbar span').first().textContent();
-    if (await app.locator('.modal.guide').count()) { await app.locator('.guide-nav button').first().click(); await app.waitForTimeout(200); }
     await app.locator('.topbar').getByRole('button').first().click(); await app.waitForTimeout(300);
     await app.locator('input[placeholder="filter sets…"]').fill('fra'); await app.waitForTimeout(400);
     await app.locator('.setrow').filter({ hasText: /Reality Fracture/ }).first().locator('button').last().click();
     for (let i = 0; i < 90; i++) { const st = await app.locator('.statusbar span').first().textContent(); if (/FRA: \d+ cards cached/.test(st)) break; await app.waitForTimeout(1000); }
-    await app.mouse.click(700, 500); await app.waitForTimeout(500);
+    await app.keyboard.press('Escape'); await app.waitForTimeout(300);          // close the set menu
+    if (await app.locator('.tip').count()) { await app.locator('.tip .nav button').first().click(); await app.waitForTimeout(300); }   // skip the first-run tour
     await app.getByRole('button', { name: '⟲ layout' }).click(); await app.waitForTimeout(600);
-    // rate FRA #1 (first card in collector order) as S in Limited
-    await app.locator('.grid .card').first().click(); await app.waitForTimeout(400);
+    // rate FRA #1 (first card in collector order) as S in Limited — double-click opens the card
+    await app.locator('.grid .card').first().dblclick(); await app.waitForTimeout(500);
     out.rated = await app.locator('.panel h2').first().textContent();
     await app.locator('.panel .block .tiers button').first().click(); await app.waitForTimeout(500);
     out.tier = await app.locator('.panel .block .block-head .badge-inline').first().textContent().catch(() => null);

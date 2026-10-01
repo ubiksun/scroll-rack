@@ -87,7 +87,7 @@ export default function OptionsModal({ contexts, schemes, dock, onClose }: Props
             <div key={sec.group}>
               <div className="opt-group">{t(sec.group as 'optAbout')}</div>
               {sec.items.map(it => (
-                <button key={it.id} className={`opt-link${pane === it.id ? ' active' : ''}`} onClick={() => { setPane(it.id); setEditScheme(null) }}>{it.label()}</button>
+                <button key={it.id} className={`opt-link${pane === it.id ? ' active' : ''}`} onClick={() => { setPane(it.id); setEditScheme(null); if (it.id === 'badges') void setSetting('badgesVisited', true) }}>{it.label()}</button>
               ))}
             </div>
           ))}

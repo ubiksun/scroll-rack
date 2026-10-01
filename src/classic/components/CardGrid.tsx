@@ -1,5 +1,6 @@
 import type { Card, BadgeStyle } from '../../db'
 import { t } from '../../i18n'
+import { setCardDrag } from '../../dnd'
 
 export interface BadgeInfo { ctxId: string; ctx: string; tier: string; color: string; style?: BadgeStyle }
 
@@ -16,6 +17,8 @@ interface Props {
   badgesFor: (c: Card) => BadgeInfo[]   // one badge per context that has a tier
   selectedId: string | null
   onSelect: (c: Card, e: React.MouseEvent) => void
+  onOpen?: (c: Card, e: React.MouseEvent) => void
+  onPeek?: (c: Card, e: React.MouseEvent) => void
   community?: Map<string, number>       // card name → GIH WR percentile (only when shown)
   linkedIds: Set<string>                // oracleIds that have ≥1 edge
   imageOf: (c: Card, size?: 'small' | 'normal' | 'large') => string
@@ -23,7 +26,7 @@ interface Props {
   zoom?: number                         // minimum thumbnail width in px; the grid still fills the panel
 }
 
-export default function CardGrid({ cards, badgesFor, selectedId, onSelect, community, linkedIds, imageOf, nameOf, zoom }: Props) {
+export default function CardGrid({ cards, badgesFor, selectedId, onSelect, onOpen, onPeek, community, linkedIds, imageOf, nameOf, zoom }: Props) {
   if (!cards.length) return <div className="empty">{t('noCards')}</div>
   // Scryfall's `small` scan is 146px wide. The grid used to always ask for it, so the thumbnails were already soft on
   // a HiDPI screen and turned to mush once the zoom control could push a tile past 146 CSS px. Pick the size from the
@@ -38,7 +41,8 @@ export default function CardGrid({ cards, badgesFor, selectedId, onSelect, commu
       {cards.map(c => {
         const p = community?.get(c.name)
         return (
-          <div key={c.id} className={`card${c.id === selectedId ? ' selected' : ''}`} onClick={e => onSelect(c, e)} title={nameOf ? nameOf(c) : c.name}>
+          <div key={c.id} className={`card${c.id === selectedId ? ' selected' : ''}`} onClick={e => onSelect(c, e)} onDoubleClick={e => onOpen?.(c, e)} onContextMenu={e => onPeek?.(c, e)} title={nameOf ? nameOf(c) : c.name}
+            draggable onDragStart={e => { setCardDrag(e, c, nameOf ? nameOf(c) : c.name); e.dataTransfer.effectAllowed = 'all' }}>
             <img src={imageOf(c, size)} alt={c.name} loading="lazy" />
             <BadgeStacks badges={badgesFor(c)} />
             {linkedIds.has(c.oracleId) && <span className="dot" title="has links" />}

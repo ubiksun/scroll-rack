@@ -595,3 +595,76 @@ tr.drop-after > td { box-shadow: inset 0 -2px 0 0 var(--accent); }
 .guide-action { margin-top: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .guide-nav { margin-top: auto; padding-top: 22px; display: flex; gap: 6px; align-items: center; }
 .guide-nav .spacer { flex: 1; }
+
+/* ---- v0.14 coach-mark tour (fixed to the viewport, above the docks) ---- */
+.tour-block { position: fixed; inset: 0; z-index: 9000; }
+.tour-dim { position: fixed; left: 0; top: 0; z-index: 9001; pointer-events: none; }
+.tour-dim path { fill: rgba(22,22,29,.58); pointer-events: visiblePainted; }
+.tour-spot { position: fixed; z-index: 9001; border-radius: 8px; box-shadow: 0 0 0 3px var(--panel); pointer-events: none; transition: left .28s cubic-bezier(.2,.7,.2,1), top .28s cubic-bezier(.2,.7,.2,1), width .28s cubic-bezier(.2,.7,.2,1), height .28s cubic-bezier(.2,.7,.2,1); }
+.tour-spot::after { content: ""; position: absolute; inset: -6px; border-radius: 12px; border: 2px solid var(--accent); animation: tour-pulse 1.8s ease-out infinite; }
+@keyframes tour-pulse { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .tour-spot, .tour-dim { transition: none; } .tour-spot::after { animation: none; } }
+.tip { position: fixed; z-index: 9002; width: 300px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px 12px; box-shadow: 0 12px 34px rgba(0,0,0,.28); font-size: 13px; }
+.tip .k { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.tip h3 { margin: 4px 0 6px; font-size: 15px; }
+.tip p { margin: 0; line-height: 1.6; }
+.tip .tour-action { margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tip .nav { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+.tip .nav .spacer { flex: 1; }
+.tip .nav button { padding: 3px 10px; font-size: 12.5px; }
+.tip .dots { display: flex; gap: 4px; }
+.tip .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--border); cursor: pointer; }
+.tip .dots i:hover { background: var(--muted); }
+.tip .dots i.on { background: var(--accent); }
+.tip .arrow { position: absolute; width: 12px; height: 12px; background: var(--panel); border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg); }
+.tip[data-side="bottom"] .arrow { top: -7px; }
+.tip[data-side="top"] .arrow { bottom: -7px; transform: rotate(225deg); }
+.tip[data-side="left"] .arrow { right: -7px; transform: rotate(135deg); }
+.tip[data-side="right"] .arrow { left: -7px; transform: rotate(-45deg); }
+.checklist { position: fixed; left: 12px; top: 48px; z-index: 8000; width: 250px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); overflow: hidden; font-size: 13px; }
+.checklist .head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-weight: 700; }
+.checklist .head .sub { margin: 0; }
+.checklist .head .caret { margin-left: auto; color: var(--muted); }
+.checklist .head .x { color: var(--muted); padding: 0 4px; border-radius: 4px; } .checklist .head .x:hover { color: #D3202A; }
+.checklist .bar { height: 4px; background: var(--border); }
+.checklist .bar i { display: block; height: 100%; background: #00733E; transition: width .3s; }
+.checklist ul { list-style: none; margin: 0; padding: 6px 0; }
+.checklist li { display: flex; align-items: center; gap: 8px; padding: 6px 12px; cursor: pointer; }
+.checklist li:hover { background: var(--accent-soft); }
+.checklist li .box { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; flex: none; }
+.checklist li.done { color: var(--muted); }
+.checklist li.done .box { background: #00733E; border-color: #00733E; color: #fff; }
+.checklist.collapsed ul, .checklist.collapsed .bar { display: none; }
+.tip .tour-state { margin-top: 8px; font-size: 12px; color: var(--muted); }
+.tip .tour-state.ok { color: #00733E; font-weight: 600; }
+.link-results .hi { background: var(--accent-soft); }
+.link-results .hint { padding: 4px 10px; cursor: default; border-top: 1px solid var(--border); margin-top: 2px; }
+.link-results .hint:hover { background: transparent; }
+
+/* card panel image: capped at a card's natural width; the spare width to its right holds the linked cards */
+.img-row { display: flex; gap: 10px; align-items: flex-start; }
+.img-row .img-main { flex: 0 1 360px; min-width: 0; }
+.img-row .img-main .artwrap { width: 100%; }
+.img-row .link-strip { border-left: 1px dashed var(--border); padding-left: 8px; max-height: 480px; }
+.dock-host .panel .section.sized .img-row { height: 100%; }
+.dock-host .panel .section.sized .img-row .img-main { height: 100%; flex: 0 1 auto; }
+
+/* ---- card image always shows the WHOLE card ----
+   Width is capped at 360px; height is capped by the panel's own height (container query) and, when the section has
+   a dragged height, by that height. The image scales down to whichever limit is tighter and never crops. */
+.dock-host .panel { container-type: size; }
+.img-row .img-main { flex: 0 1 auto; max-width: 360px; min-width: 0; }
+.img-row .img-main .artwrap { width: auto; display: block; }
+.dock-host .panel .img-row img.big,
+.dock-host .panel .section.sized .img-row img.big { display: block; width: auto; height: auto; max-width: 100%; max-height: min(502px, 78cqh); object-fit: contain; margin-bottom: 0; }
+.dock-host .panel .section.sized .img-row img.big { max-height: min(502px, 78cqh, calc(var(--sec-h, 502px) - 44px)); }
+.dock-host .panel .section.sized .img-row, .dock-host .panel .section.sized .img-row .img-main { height: auto; }
+.dock-host .panel .section.sized:has(.img-row) { overflow: hidden; }
+
+/* ---- linked cards as a stack: each card overlaps the one above, leaving its title bar; hover lifts a card ---- */
+.link-strip { --lw: 112px; width: calc(var(--lw) + 14px); gap: 0; overflow: visible; }
+.link-strip .sub { margin-bottom: 6px; }
+.link-strip img { position: relative; width: var(--lw); aspect-ratio: 488 / 680; border-radius: 6px; transition: transform .1s; }
+.link-strip img + img { margin-top: calc(var(--lw) * -680 / 488 + 20px); }
+.link-strip img:hover { z-index: 5; transform: translateX(-6px); outline: 2px solid var(--accent); }
+.img-row .link-strip { max-height: none; }

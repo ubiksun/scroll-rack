@@ -24,7 +24,7 @@ export default function ImagePanel({ api, containerApi, params }: { api: Dockvie
   useEffect(() => { const end = () => setOver(false); document.addEventListener('dragend', end); document.addEventListener('drop', end); return () => { document.removeEventListener('dragend', end); document.removeEventListener('drop', end) } }, [])
   const nav = params.linked ? g.navOfChannel(params.channel) : undefined
   const peek = (c: Card, e: React.MouseEvent) => { e.preventDefault(); g.showPeek(c, e.clientX, e.clientY) }
-  if (!card) return <div className="empty">{t('selectCardHint')}</div>
+  if (!card) return <div className="empty" data-tour="cardpanel">{t('selectCardHint')}</div>
   const linked = edges.map(e => ({ edge: e, c: g.cardsByOracle.get(e.a === card.oracleId ? e.b : e.a) })).filter((x): x is { edge: typeof x.edge; c: Card } => !!x.c)
   // Drag a linked thumbnail OUT of the strip and let go anywhere else → the link is removed (the reverse of dropping
   // a card on the panel). Releasing it back inside the strip keeps it. Chrome reports the release point on dragend.
@@ -53,7 +53,7 @@ export default function ImagePanel({ api, containerApi, params }: { api: Dockvie
     g.setStatus(`${t('linked')}: ${g.nameOf(card)} ⇆ ${d.name}`)
   }
   return (
-    <div className={`single imgdock${over ? ' drop-link' : ''}`} onDragOver={onDragOver} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false) }} onDrop={onDrop}>
+    <div className={`single imgdock${over ? ' drop-link' : ''}`} data-tour="cardpanel" onDragOver={onDragOver} onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false) }} onDrop={onDrop}>
       {over && <div className="drop-hint">{t('dropToLink')}</div>}
       {!params.linked && <FrozenBar containerApi={containerApi} card={card} />}
       <div className="single-nav compact">

@@ -1,9 +1,9 @@
 import { Fragment } from 'react'
 import { FEATURES } from '../../features'
 import { t } from '../../i18n'
+import type { Card } from '../../db'
 import { useGrader } from '../../state'
 import { useScope } from '../scope'
-import type { OpenMode } from '../docks'
 import CardGrid from '../components/CardGrid'
 import BoardView from '../../components/BoardView'
 import NavBar from './NavBar'
@@ -20,14 +20,17 @@ export default function BrowsePanel() {
   const s = useScope()
   const flip = (set: Set<string>, v: string) => { const n = new Set(set); n.has(v) ? n.delete(v) : n.add(v); return n }
   const hasSets = g.activeSets.length > 0 || (s.q.searchScope === 'all' && !!s.q.textF.trim())
-  const open = (_e: React.MouseEvent): OpenMode => 'primary'   // the modifier shortcut is gone: a pinned card dock comes from + Card
+  // click = select only · double-click = open in the card panel · right-click = rules text at the pointer (default since 0.14)
+  const onSelect = (c: Card) => s.setSelected(c)
+  const onOpen = (c: Card) => s.setSelected(c, { open: 'primary' })
+  const onPeek = (c: Card, e: React.MouseEvent) => { e.preventDefault(); g.showPeek(c, e.clientX, e.clientY) }
   return (
     <div className="pane">
       <div className="topbar sub-bar">
-        <div className="group search-group">
+        <div className="group search-group" data-tour="search">
           <input placeholder={s.q.searchScope === 'all' ? 'Search all of Scryfall (Scryfall syntax) …' : t('search')} value={s.draft} onChange={e => s.setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); s.submit() } }} className={`search${s.searchState === 'error' ? ' err' : ''}${s.draft !== s.q.textF ? ' dirty' : ''}`} />
           <button className={s.draft !== s.q.textF ? 'active' : ''} onClick={s.submit} title={t('searchGo')}>🔍</button>
-          <button className={s.q.searchScope === 'all' ? 'active' : ''} onClick={() => s.patch({ searchScope: s.q.searchScope === 'all' ? 'active' : 'all' })} title={s.q.searchScope === 'all' ? 'Searching every set on Scryfall (results are cached as you open them). Click to search only the active sets.' : 'Searching the active sets only. Click to search all of Scryfall.'}>{s.q.searchScope === 'all' ? '🌐 all sets' : '▣ active sets'}</button>
+          <button data-tour="scope" className={s.q.searchScope === 'all' ? 'active' : ''} onClick={() => s.patch({ searchScope: s.q.searchScope === 'all' ? 'active' : 'all' })} title={s.q.searchScope === 'all' ? 'Searching every set on Scryfall (results are cached as you open them). Click to search only the active sets.' : 'Searching the active sets only. Click to search all of Scryfall.'}>{s.q.searchScope === 'all' ? '🌐 all sets' : '▣ active sets'}</button>
           <span className="status">{s.searchState === 'busy' ? t('searching') : s.searchState === 'error' ? t('syntaxError') : s.searchState === 'local' ? t('localSearch') : ''}</span>
         </div>
         <div className="group">
@@ -55,7 +58,7 @@ export default function BrowsePanel() {
       <div className="content">
         {!hasSets && <div className="empty empty-cta"><div>{t('pickSet')}</div><button onClick={() => window.dispatchEvent(new Event('sr:guide'))}>{t('guideOpen')}</button></div>}
         {hasSets && s.q.view === 'grid' && (
-          <CardGrid zoom={s.q.zoom} cards={s.filtered} badgesFor={g.badgesFor} selectedId={s.selected?.id ?? null} onSelect={(c, e) => s.setSelected(c, { open: open(e) })}
+          <CardGrid zoom={s.q.zoom} cards={s.filtered} badgesFor={g.badgesFor} selectedId={s.selected?.id ?? null} onSelect={onSelect} onOpen={onOpen} onPeek={onPeek}
             community={FEATURES.community && g.showCommunity ? g.percentiles : undefined} linkedIds={g.linkedIds} imageOf={g.imageOf} nameOf={g.nameOf} />
         )}
         {hasSets && s.q.view === 'single' && (
@@ -74,7 +77,7 @@ export default function BrowsePanel() {
                   {[left, right].map((c, i) => (
                     <Fragment key={c.id}>
                       {i === 1 && <div className="pair-glyph">⇆</div>}
-                      <div className={`pair-side${c.id === sel.id ? ' focus' : ''}`} onClick={e => s.setSelected(c, { open: open(e) })}>{pic(c)}<div className="sub">#{c.collectorNumber} · {g.nameOf(c)} {c.watermark === 'echoverse' && <span className="badge-inline echo">echoverse</span>}</div></div>
+                      <div className={`pair-side${c.id === sel.id ? ' focus' : ''}`} onClick={() => onSelect(c)} onDoubleClick={() => onOpen(c)} onContextMenu={e => onPeek(c, e)}>{pic(c)}<div className="sub">#{c.collectorNumber} · {g.nameOf(c)} {c.watermark === 'echoverse' && <span className="badge-inline echo">echoverse</span>}</div></div>
                     </Fragment>
                   ))}
                 </div>
@@ -83,7 +86,7 @@ export default function BrowsePanel() {
           </div>
         )}
         {hasSets && s.q.view === 'board' && (
-          <BoardView cards={s.filtered} contexts={g.contexts} schemes={g.schemes} ratingOf={g.ratingOf} imageOf={g.imageOf} selectedId={s.selected?.id ?? null} onSelect={(c, e) => s.setSelected(c, { open: open(e) })} />
+          <BoardView cards={s.filtered} contexts={g.contexts} schemes={g.schemes} ratingOf={g.ratingOf} imageOf={g.imageOf} selectedId={s.selected?.id ?? null} onSelect={onSelect} onOpen={onOpen} onPeek={onPeek} />
         )}
       </div>
     </div>
