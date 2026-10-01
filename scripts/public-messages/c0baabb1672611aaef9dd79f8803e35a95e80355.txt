@@ -1,0 +1,5 @@
+chore(scroll-rack): pre-v0.14.0 work in progress — image zone, tab panel, onboarding draft, docks and i18n rework
+
+Committed together with other monorepo backlog; the features ship in v0.14.0.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
