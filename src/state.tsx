@@ -6,7 +6,7 @@ import { fetchCommunity, gihPercentiles } from './api/seventeen'
 import { FEATURES } from './features'
 import { fetchCommunityTags as fetchCommunityTagsDirect } from './api/tagger'
 import { fetchZhSet } from './api/mtgch'
-import { setLang as setI18n, t, type Lang } from './i18n'
+import { setLang as setI18n, t, tx, type Lang } from './i18n'
 import { isBasicLand, TIER_SEP, type QueryDeps, type View } from './query'
 import type { ZhCard } from './db'
 // In the extension, Tagger requests go through the background worker (see background.ts); the vite preview calls directly.
@@ -201,8 +201,8 @@ export function GraderProvider({ children }: { children: ReactNode }) {
       for (const code of activeSets) {
         if (zhSetsLoaded.has(code)) continue
         if (!(await db.sets.get(code))) continue
-        setStatus(`大学院废墟：载入 ${code.toUpperCase()} 中文资料…`)
-        try { const n = await fetchZhSet(code); if (live) setStatus(`大学院废墟：${code.toUpperCase()} ${n} 张中文资料`) } catch (e) { if (live) setStatus(`大学院废墟 ${code.toUpperCase()}: ${String(e)}`) }
+        setStatus(tx('stZhLoading', { set: code.toUpperCase() }))
+        try { const n = await fetchZhSet(code); if (live) setStatus(tx('stZhLoaded', { set: code.toUpperCase(), n })) } catch (e) { if (live) setStatus(`大学院废墟 ${code.toUpperCase()}: ${String(e)}`) }
       }
     })()
     return () => { live = false }
@@ -269,10 +269,10 @@ export function GraderProvider({ children }: { children: ReactNode }) {
   const toggleCollapse = useCallback((id: string) => setCollapsed(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n }), [])
 
   const pullSet = useCallback(async (code: string) => {
-    setBusySet(code); setStatus(`Fetching ${code.toUpperCase()}…`)
+    setBusySet(code); setStatus(tx('stFetching', { set: code.toUpperCase() }))
     try {
-      const n = await fetchSet(code, k => setStatus(`Fetching ${code.toUpperCase()}… ${k} prints`))
-      setStatus(`${code.toUpperCase()}: ${n} cards cached`)
+      const n = await fetchSet(code, k => setStatus(tx('stFetchingPrints', { set: code.toUpperCase(), n: k })))
+      setStatus(tx('stCached', { set: code.toUpperCase(), n }))
       setActiveSets(s => (s.includes(code) ? s : [...s, code]))
     } catch (e) { setStatus(String(e)) } finally { setBusySet(null) }
   }, [])
@@ -282,21 +282,21 @@ export function GraderProvider({ children }: { children: ReactNode }) {
     const failed: string[] = []
     let i = 0
     for (const code of missing) {
-      i++; setBusySet(code); setStatus(`Loading ${i}/${missing.length}: ${code.toUpperCase()}…`)
-      try { await fetchSet(code, k => setStatus(`Loading ${i}/${missing.length}: ${code.toUpperCase()} … ${k} prints`)) } catch (e) { setStatus(`${code.toUpperCase()}: ${String(e)}`); failed.push(code) }
+      i++; setBusySet(code); setStatus(tx('stLoadingN', { i, total: missing.length, set: code.toUpperCase() }))
+      try { await fetchSet(code, k => setStatus(tx('stLoadingNPrints', { i, total: missing.length, set: code.toUpperCase(), n: k }))) } catch (e) { setStatus(`${code.toUpperCase()}: ${String(e)}`); failed.push(code) }
       await new Promise(r => setTimeout(r, 600))   // breathe between sets — Scryfall throttles bursts
     }
     setBusySet(null)
     const ok = codes.filter(c => !failed.includes(c))
     setActiveSets(s => [...new Set([...s, ...ok])])
-    setStatus(failed.length ? `${ok.length} sets active · failed: ${failed.map(c => c.toUpperCase()).join(', ')} — retry with load all` : `${codes.length} sets active`)
+    setStatus(failed.length ? tx('stSetsFailed', { n: ok.length, list: failed.map(c => c.toUpperCase()).join(', ') }) : tx('stSetsActive', { n: codes.length }))
   }, [localSets])
   const toggleSet = useCallback(async (code: string) => {
     if (activeSets.includes(code)) { setActiveSets(s => s.filter(x => x !== code)); return }
     if (localSets.some(s => s.code === code)) setActiveSets(s => [...s, code]); else await pullSet(code)
   }, [activeSets, localSets, pullSet])
   const pullCommunity = useCallback(async () => {
-    for (const code of activeSets) { setStatus(`Fetching 17lands ${code.toUpperCase()}…`); try { const s = await fetchCommunity(code); setStatus(s.rows.length ? `17lands ${code.toUpperCase()}: ${s.rows.length} cards` : `17lands: no data yet for ${code.toUpperCase()}`) } catch (e) { setStatus(String(e)) } }
+    for (const code of activeSets) { setStatus(tx('stFetching17', { set: code.toUpperCase() })); try { const s = await fetchCommunity(code); setStatus(s.rows.length ? tx('st17', { set: code.toUpperCase(), n: s.rows.length }) : tx('st17None', { set: code.toUpperCase() })) } catch (e) { setStatus(String(e)) } }
   }, [activeSets])
   const ensureSetActive = useCallback((code: string) => setActiveSets(s => (s.includes(code) ? s : [...s, code])), [])
 

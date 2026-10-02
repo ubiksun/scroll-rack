@@ -3,9 +3,12 @@
 // Replacing the folder contents in place + ↻ on chrome://extensions keeps all data (it lives in the Chrome profile).
 // Web Store installs update themselves; the banner simply never fires for them (store version == latest).
 export const UPDATE_URL = 'https://raw.githubusercontent.com/ubiksun/scroll-rack/main/release/latest.json'
+import { getLang } from './i18n'
 const CHECK_EVERY = 6 * 60 * 60 * 1000
 
-export interface LatestInfo { version: string; zip: string; notes?: string; date?: string }
+export interface LatestInfo { version: string; zip: string; notes?: string; notes_zh?: string; date?: string }
+// the banner's one-liner in the interface language (falls back to whichever exists)
+export const notesOf = (l: LatestInfo) => (getLang() === 'zh' ? (l.notes_zh || l.notes) : (l.notes || l.notes_zh)) || ''
 
 declare const __SR_VERSION__: string   // injected by vite.config.ts from public/manifest.json (the web/LAN test build has no chrome.runtime)
 export const currentVersion = () => (typeof chrome !== 'undefined' && chrome.runtime?.getManifest ? chrome.runtime.getManifest().version : __SR_VERSION__)

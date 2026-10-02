@@ -60,7 +60,7 @@ export default function BadgeDesign({ contexts }: Props) {
                   </label>
                   <label>{t('badgeShape')}
                     <select value={st.shape} onChange={e => setStyle(c.id, { shape: e.target.value as BadgeStyle['shape'] })}>
-                      <option value="pill">pill</option><option value="circle">circle</option><option value="square">square</option>
+                      <option value="pill">{t('badgeShapePill')}</option><option value="circle">{t('badgeShapeCircle')}</option><option value="square">{t('badgeShapeSquare')}</option>
                     </select>
                   </label>
                   <label>{t('badgeSize')}

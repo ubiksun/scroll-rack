@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { t } from '../i18n'
 import { pickPrinting, type ArtMode, type ArtPref, type Card } from '../db'
 
 interface Props {
@@ -24,7 +25,7 @@ export default function ArtPicker({ card, src, className, artPref, artMode, onSe
   return (
     <div className="artwrap" ref={wrap}>
       <img className={className} src={src} alt={card.name} />
-      {many && <button className="art-btn" onClick={() => setOpen(v => !v)} title="choose card art">🖼 {card.printings.length}</button>}
+      {many && <button className="art-btn" onClick={() => setOpen(v => !v)} title={t('chooseArt')}>🖼 {card.printings.length}</button>}
       {open && (
         <div className="art-pop">
           {card.printings.map(p => (

@@ -12,7 +12,9 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 // 'rate', so every rating dimension has its own notes — same shape as the app's card panel.
 type SectionId = 'rate' | 'tags' | 'links' | 'community'
 const ALL_SECTIONS: SectionId[] = ['rate', 'tags', 'links', 'community']
-const SECTION_TITLE: Record<SectionId, string> = { rate: 'Ratings', tags: 'Tags', links: 'Links', community: '17lands' }
+// overlay strings come from _locales (browser language); $1 is chrome.i18n's placeholder syntax
+const L = (key: string, sub?: string | string[]) => (typeof chrome !== 'undefined' && chrome.i18n?.getMessage(key, sub)) || key
+const SECTION_TITLE: Record<SectionId, string> = { rate: L('ovRatings'), tags: L('ovTags'), links: L('ovLinks'), community: '17lands' }
 interface OverlayPrefs { x: number; y: number; collapsed: boolean; sections: SectionId[]; closed: string[] }
 const DEFAULT_PREFS: OverlayPrefs = { x: Math.max(16, window.innerWidth - 324), y: 72, collapsed: false, sections: ALL_SECTIONS, closed: [] }   // right edge, under Scryfall's header
 
@@ -51,8 +53,8 @@ async function renderCardPanel() {
   const appName = (typeof chrome !== 'undefined' && chrome.i18n?.getMessage('extName')) || 'Scroll Rack'
   head.append(el('span', 'lg-title', appName))
   const tools = el('span', 'lg-tools')
-  const gear = el('button', 'lg-btn', '⚙'); gear.title = 'sections'
-  const openBtn = el('button', 'lg-btn', '↗'); openBtn.title = (typeof chrome !== 'undefined' && chrome.i18n?.getMessage('actionTitle')) || 'open Scroll Rack'
+  const gear = el('button', 'lg-btn', '⚙'); gear.title = L('ovSections')
+  const openBtn = el('button', 'lg-btn', '↗'); openBtn.title = L('actionTitle')
   const collapse = el('button', 'lg-btn', prefs.collapsed ? '▸' : '▾')
   tools.append(gear, openBtn, collapse); head.append(tools); panel.append(head)
   openBtn.onclick = () => void send({ type: 'openApp' })
@@ -87,10 +89,10 @@ async function renderCardPanel() {
   const drawBody = () => {
     body.replaceChildren()
     if (!data.found) {
-      body.append(el('div', 'lg-muted', data.setLoaded ? `Not in cached ${data.set.toUpperCase()} (re-fetch the set in the grader).` : `Set ${data.set.toUpperCase()} not loaded.`))
+      body.append(el('div', 'lg-muted', data.setLoaded ? L('ovNotInSet', data.set.toUpperCase()) : L('ovSetNotLoaded', data.set.toUpperCase())))
       if (!data.setLoaded) {
-        const b = el('button', 'lg-btn lg-wide', `Load ${data.set.toUpperCase()} now`)
-        b.onclick = async () => { b.textContent = 'loading…'; b.disabled = true; await send({ type: 'fetchSet', set: data.set }); void renderCardPanel() }
+        const b = el('button', 'lg-btn lg-wide', L('ovLoadNow', data.set.toUpperCase()))
+        b.onclick = async () => { b.textContent = L('ovLoading'); b.disabled = true; await send({ type: 'fetchSet', set: data.set }); void renderCardPanel() }
         body.append(b)
       }
       return
@@ -164,7 +166,7 @@ function section(id: SectionId, d: OverlayCard, prefs: OverlayPrefs): HTMLElemen
         }
         // one notes box per context — the overlay used to show only the first context's note
         const ta = el('textarea', 'lg-note') as HTMLTextAreaElement
-        ta.placeholder = `${ctx.name} — notes`
+        ta.placeholder = `${ctx.name} — ${L('ovNotes')}`
         ta.value = r?.note ?? ''
         let h: number | undefined
         ta.oninput = () => {
@@ -189,7 +191,7 @@ function section(id: SectionId, d: OverlayCard, prefs: OverlayPrefs): HTMLElemen
           const x = el('span', 'lg-x', '✕'); x.onclick = async () => { await send({ type: 'tag', oracleId: d.oracleId, tag: tg, remove: true }); d.tags = d.tags.filter(z => z !== tg); draw() }
           c.append(x); chips.append(c)
         }
-        const inp = el('input', 'lg-tag-in') as HTMLInputElement; inp.placeholder = 'add tag…'
+        const inp = el('input', 'lg-tag-in') as HTMLInputElement; inp.placeholder = L('ovAddTag')
         inp.onkeydown = async e => { if (e.key === 'Enter' && inp.value.trim()) { const tg = inp.value.trim().toLowerCase().replace(/^#/, ''); await send({ type: 'tag', oracleId: d.oracleId, tag: tg }); if (!d.tags.includes(tg)) d.tags.push(tg); draw(); chips.querySelector<HTMLInputElement>('.lg-tag-in')?.focus() } }
         chips.append(inp)
       }
@@ -205,19 +207,19 @@ function section(id: SectionId, d: OverlayCard, prefs: OverlayPrefs): HTMLElemen
         if (l.note) { const n = el('span', 'lg-muted', ' ✎'); n.title = l.note; row.append(n) }
         body.append(row)
       }
-      if (!d.links.length) body.append(el('div', 'lg-muted', 'no links — add them in the grader'))
+      if (!d.links.length) body.append(el('div', 'lg-muted', L('ovNoLinks')))
       break
     }
     case 'community': {
       const body = block('sec:community', SECTION_TITLE.community)
-      if (!d.community) { body.append(el('div', 'lg-muted', 'no snapshot for this set')); break }
+      if (!d.community) { body.append(el('div', 'lg-muted', L('ovNoSnapshot'))); break }
       const c = d.community
       const pct = (v: number | null) => v == null ? '—' : `${(v * 100).toFixed(1)}%`
       const kv = el('div', 'lg-kv')
       const add = (k: string, v: string) => { kv.append(el('b', '', k), el('span', '', v)) }
       add('GIH WR', `${pct(c.gih)}${c.percentile != null ? ` (P${c.percentile})` : ''}`)
       add('OH WR', pct(c.oh)); add('IWD', c.iwd == null ? '—' : `${(c.iwd * 100).toFixed(1)}pp`)
-      add('ALSA / ATA', `${c.alsa?.toFixed(2) ?? '—'} / ${c.ata?.toFixed(2) ?? '—'}`); add('Games', c.games.toLocaleString())
+      add('ALSA / ATA', `${c.alsa?.toFixed(2) ?? '—'} / ${c.ata?.toFixed(2) ?? '—'}`); add(L('ovGames'), c.games.toLocaleString())
       body.append(kv)
       break
     }

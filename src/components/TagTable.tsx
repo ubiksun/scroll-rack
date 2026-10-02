@@ -49,7 +49,7 @@ export default function TagTable({ contexts, schemes, onEditTiers }: Props) {
     <>
       <div className="sub" style={{ marginBottom: 8 }}>{t('commentsHint')}</div>
       <table className="tagtable">
-        <thead><tr><th title="show as a badge on card images">{t('commentOnCard')}</th><th>{t('commentName')}</th><th>{t('commentTiers')}</th><th></th></tr></thead>
+        <thead><tr><th title={t('showAsBadge')}>{t('commentOnCard')}</th><th>{t('commentName')}</th><th>{t('commentTiers')}</th><th></th></tr></thead>
         <tbody>
           {contexts.map((c, i) => {
             const sc = schemes.find(s => s.id === c.schemeId)
@@ -66,7 +66,7 @@ export default function TagTable({ contexts, schemes, onEditTiers }: Props) {
                 <td><input type="text" value={draft[c.id] ?? c.name} onChange={e => setDraft(d => ({ ...d, [c.id]: e.target.value }))}
                   onBlur={() => rename(c)} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} /></td>
                 <td>
-                  <select value={c.schemeId} onChange={e => db.contexts.update(c.id, { schemeId: e.target.value })} title="tier set">
+                  <select value={c.schemeId} onChange={e => db.contexts.update(c.id, { schemeId: e.target.value })} title={t('tierSetHint')}>
                     {schemes.map(s => <option key={s.id} value={s.id}>{s.name} ({s.tiers.length})</option>)}
                   </select>
                   {sc && <button className="linkish" onClick={() => onEditTiers(sc)} title={sc.tiers.map(x => x.name).join(' / ')}>{t('commentEditTiers')}</button>}

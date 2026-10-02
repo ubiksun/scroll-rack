@@ -98,3 +98,35 @@ Lets Magic: The Gathering players rate cards on their own tier scales and keep n
 ## Live listing
 
 https://chromewebstore.google.com/detail/scroll-rack/oejlhhgcahmkcocomlkocjccnandkmdp (Public, verified 2026-09-22)
+
+
+## Store listing text (简体中文) — paste into the zh-CN listing
+
+**Summary**(≤132 字,与 manifest 相同):
+卷轴架是一款用于对万智牌进行评分和注释的浏览器扩展程序
+
+**Description:**
+
+卷轴架是一本记录*你自己*如何评价万智牌卡牌的笔记本。
+
+竞技玩家每个赛季都会对几百张卡形成看法——预览周、测试时、比赛后——而这些看法大多很快就散了。卷轴架给它们一个落脚点:当需要的时候(专业巡回赛前的测试、一场轮抽、一篇系列评测),你可以逐卡回看自己当时的判断,并对照结果。
+
+功能
+
+• 按自己的尺度给每张卡评分。想定义多少条评语就定义多少条——Limited、标准、Cube,你玩什么就定什么——每条有自己的档位阶梯(S–F、1–10、或你自己的用词)。同一张卡在不同赛制可以有不同评价。
+• 写下来。每条评语各有一段笔记,外加跨系列通用的自由标签(「去除」「核心构筑」「备牌针对 Jund」……)。
+• 在你已经在的地方看到它。你的档位以徽章显示在 scryfall.com 上——卡牌页和搜索结果都有——浮动面板让你不离开 Scryfall 就能评分和写笔记。
+• 按你的思路工作。网格、单卡逐张翻阅、拖拽到档位行的评语板;多级排序(Notion 式);到处都能用 Scryfall 搜索语法;可自由拖放的面板。
+• 日后回看自己。把任意系列导出为 CSV 或 Markdown(可直接进 Obsidian),拿预览周的判断对照结果。
+• 认识系列。Reality Fracture 的 Echoverse 镜像并排显示;系列列表按赛制分组(标准 / 先驱 / 近代),一键加载整个赛制。
+• 双语卡牌数据。卡名、文字、扫描图可切换为中文(来自大学院废墟 / mtgch.com);界面支持英文与中文。
+
+适合谁
+
+认真评估系列、想留下自己的记录而不是又一份汇总 tier list 的玩家;准备系列评测的内容创作者;任何曾经想过「我早知道那张卡强」并想拿出证据的人。
+
+隐私
+
+一切都留在你的浏览器里。无账号、无服务器、无统计。卡牌数据与图像来自 Scryfall(中文可选来自 mtgch.com)。一键 JSON 导出即可备份或迁移数据。
+
+开源(MIT):https://github.com/ubiksun/scroll-rack

@@ -7,5 +7,59 @@
   },
   "actionTitle": {
     "message": "打开卷轴架"
+  },
+  "ovRatings": {
+    "message": "评语"
+  },
+  "ovTags": {
+    "message": "标签"
+  },
+  "ovLinks": {
+    "message": "链接"
+  },
+  "ovSections": {
+    "message": "显示哪些段落"
+  },
+  "ovNotes": {
+    "message": "笔记"
+  },
+  "ovAddTag": {
+    "message": "添加标签…"
+  },
+  "ovNoLinks": {
+    "message": "暂无链接 — 在卷轴架中添加。"
+  },
+  "ovNoSnapshot": {
+    "message": "此系列没有 17lands 快照。"
+  },
+  "ovGames": {
+    "message": "对局数"
+  },
+  "ovLoading": {
+    "message": "加载中…"
+  },
+  "ovNotInSet": {
+    "message": "不在已缓存的 $SET$ 数据中 — 在卷轴架中重新拉取该系列。",
+    "placeholders": {
+      "SET": {
+        "content": "$1"
+      }
+    }
+  },
+  "ovSetNotLoaded": {
+    "message": "尚未加载系列 $SET$。",
+    "placeholders": {
+      "SET": {
+        "content": "$1"
+      }
+    }
+  },
+  "ovLoadNow": {
+    "message": "立即加载 $SET$",
+    "placeholders": {
+      "SET": {
+        "content": "$1"
+      }
+    }
   }
 }

@@ -29,7 +29,7 @@ export default function OraclePanel({ api, containerApi, params }: Props) {
   void tick
   const bound = owner ? asCard(owner.params) : undefined
   const c = bound?.set && bound.oracleId ? g.cardByKey.get(`${bound.set}:${bound.oracleId}`) ?? null : null
-  if (!c) return <div className="empty">Select a card.</div>
+  if (!c) return <div className="empty">{t('selectCardHint')}</div>
 
   // oracleLang pins this panel's language independently of the global card language
   const lang = g.oracleLang === 'follow' ? g.cardLang : g.oracleLang
@@ -43,7 +43,7 @@ export default function OraclePanel({ api, containerApi, params }: Props) {
       <div className="sub">{c.manaCost} · {type} · {c.rarity} · {c.set.toUpperCase()} #{c.collectorNumber}</div>
       <div className="oracle" style={{ marginTop: 10, fontSize: 14 }}>{text}</div>
       {zh && zh.flavor && <div className="sub" style={{ marginTop: 6, fontStyle: 'italic' }}>{zh.flavor}</div>}
-      {zh && <div className="sub" style={{ marginTop: 6 }}>中文资料：<a href={`https://mtgch.com/card/${c.set}/${c.collectorNumber}`} target="_blank" rel="noreferrer">大学院废墟 ↗</a></div>}
+      {zh && <div className="sub" style={{ marginTop: 6 }}>{t('zhSource')}<a href={`https://mtgch.com/card/${c.set}/${c.collectorNumber}`} target="_blank" rel="noreferrer">大学院废墟 ↗</a></div>}
       {c.keywords.length > 0 && <div className="sub" style={{ marginTop: 8 }}>{t('keywords')}: {c.keywords.join(', ')}</div>}
       <div className="sub" style={{ marginTop: 8 }}><a href={c.scryfallUri} target="_blank" rel="noreferrer">Scryfall ↗</a></div>
     </div>

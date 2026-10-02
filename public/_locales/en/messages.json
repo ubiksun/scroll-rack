@@ -10,5 +10,59 @@
   "actionTitle": {
     "message": "Open Scroll Rack",
     "description": "Toolbar button tooltip"
+  },
+  "ovRatings": {
+    "message": "Ratings"
+  },
+  "ovTags": {
+    "message": "Tags"
+  },
+  "ovLinks": {
+    "message": "Links"
+  },
+  "ovSections": {
+    "message": "Sections"
+  },
+  "ovNotes": {
+    "message": "notes"
+  },
+  "ovAddTag": {
+    "message": "add tag…"
+  },
+  "ovNoLinks": {
+    "message": "No links yet — add them in Scroll Rack."
+  },
+  "ovNoSnapshot": {
+    "message": "No 17lands snapshot for this set."
+  },
+  "ovGames": {
+    "message": "Games"
+  },
+  "ovLoading": {
+    "message": "Loading…"
+  },
+  "ovNotInSet": {
+    "message": "Not in the cached $SET$ data — re-fetch the set in Scroll Rack.",
+    "placeholders": {
+      "SET": {
+        "content": "$1"
+      }
+    }
+  },
+  "ovSetNotLoaded": {
+    "message": "Set $SET$ is not loaded.",
+    "placeholders": {
+      "SET": {
+        "content": "$1"
+      }
+    }
+  },
+  "ovLoadNow": {
+    "message": "Load $SET$ now",
+    "placeholders": {
+      "SET": {
+        "content": "$1"
+      }
+    }
   }
 }

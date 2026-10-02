@@ -40,4 +40,4 @@ export function tierOf(s: { code: string; released_at: string; set_type: string;
   if ((mainline || horizons) && s.released_at >= '2003-07-28') return 'modern'
   return 'other'
 }
-export const TIER_LABEL: Record<Tier, string> = { standard: 'Standard (incl. upcoming)', pioneer: 'Pioneer — rotated out of Standard', modern: 'Modern only — pre-Pioneer + Horizons', other: 'Other — Masters · supplemental · pre-Modern' }
+// labels live in i18n (fmtStandard …); see SetPicker

@@ -9,6 +9,7 @@
 import type { DockviewApi, IDockviewPanel } from 'dockview-react'
 import type { Card } from '../db'
 import { DEFAULT_QUERY, type SerializedQuery } from '../query'
+import { t } from '../i18n'
 
 export type OracleMode = 'shared' | 'attached' | 'section'
 export type OracleLang = 'follow' | 'en' | 'zh'
@@ -87,7 +88,7 @@ export function addBrowseDock(api: DockviewApi, seed?: Partial<SerializedQuery>)
   const n = api.panels.filter(isBrowsePanel).length + 1
   const ref = api.panels.find(isBrowsePanel) ?? api.panels[0]
   api.addPanel({
-    id, component: COMPONENT.browse, title: `Search ${n}`,
+    id, component: COMPONENT.browse, title: `${t('zoneSearch')} ${n}`,
     params: { kind: 'browse', scopeId: nextScopeId(api), q: { ...DEFAULT_QUERY, ...(seed ?? {}) }, sel: null } satisfies BrowseParams,
     position: ref ? { referencePanel: ref.id, direction: 'within' } : undefined,
   })

@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { db, upsertRating, addTag, removeTag, addEdge as dbAddEdge, tagEdge, type ArtMode, type ArtPref, type Card, type CardTag, type CommunityRow, type CommunityTagsRow, type Context, type Edge, type Rating, type Scheme } from '../db'
 import { pct } from '../api/seventeen'
 import { FEATURES } from '../features'
-import { t } from '../i18n'
+import { t, tx } from '../i18n'
 import ArtPicker from './ArtPicker'
 import { searchCards } from '../api/scryfall'
 import { hasCardDrag } from '../dnd'
@@ -60,7 +60,7 @@ function ContextBlock({ uid, card, ctx, scheme, rating, open, onToggle, onDropCt
       <div className="block-head draggable" draggable onClick={onToggle}
         onDragStart={e => { e.stopPropagation(); onDragCtx(ctx.id); e.dataTransfer.setData('text/context', ctx.id); e.dataTransfer.effectAllowed = 'move' }}
         onDragEnd={() => { onDragCtx(null); onOverCtx(null) }}
-        title="click to collapse · drag to reorder">
+        title={t('collapseReorder')}>
         <span className="caret">{open ? '▾' : '▸'}</span>
         <b>{ctx.name}</b>
         {tier && <span className="badge-inline" style={{ background: tier.color }}>{tier.name}</span>}
@@ -144,11 +144,11 @@ export default function CardPanel(p: Props) {
     <div className="block-head draggable" draggable onClick={() => onToggleCollapse(id)}
       onDragStart={e => { setDragSec(id); e.dataTransfer.setData('text/section', id); e.dataTransfer.effectAllowed = 'move' }}
       onDragEnd={() => { setDragSec(null); setOverSec(null) }}
-      title="click to collapse · drag to reorder">
+      title={t('collapseReorder')}>
       <span className="caret">{collapsed.has(id) ? '▸' : '▾'}</span>
       <b>{title}</b>
       <span className="sec-move" onClick={e => e.stopPropagation()}>
-        {heights[id] && <button onClick={() => onResizeSection(id, null)} title="fit to content">⤢</button>}
+        {heights[id] && <button onClick={() => onResizeSection(id, null)} title={t('fitContent')}>⤢</button>}
       </span>
     </div>
   )
@@ -233,14 +233,14 @@ export default function CardPanel(p: Props) {
               </div>
               {communityTags !== undefined && (
                 <div className="tagger">
-                  <div className="sub row" style={{ gap: 6 }}><span>◈ Scryfall Tagger</span>{communityTags && <span>· {new Date(communityTags.fetchedAt).toLocaleDateString()}</span>}<button onClick={onRefreshCommunity} title="re-fetch">↻</button></div>
-                  {communityTags === null && <div className="sub">loading… (or unavailable)</div>}
-                  {communityTags && communityTags.cardTags.length === 0 && <div className="sub">no card tags yet</div>}
+                  <div className="sub row" style={{ gap: 6 }}><span>{t('taggerTitle')}</span>{communityTags && <span>· {new Date(communityTags.fetchedAt).toLocaleDateString()}</span>}<button onClick={onRefreshCommunity} title={t('refetchTagger')}>↻</button></div>
+                  {communityTags === null && <div className="sub">{t('taggerLoading')}</div>}
+                  {communityTags && communityTags.cardTags.length === 0 && <div className="sub">{t('taggerNone')}</div>}
                   {communityTags && communityTags.cardTags.length > 0 && (
                     <div className="chips">
                       {communityTags.cardTags.map(tg => {
                         const mine = tags.some(x => x.tag === tg.toLowerCase())
-                        return <span className={`chip tagger-chip${mine ? ' adopted' : ''}`} key={tg} title={mine ? 'already in your tags' : 'click + to add to your tags (stays here too)'}>{tg} <span className="ico">◈</span>{!mine && <span className="x add" onClick={() => addTag(card.oracleId, tg)}>+</span>}{mine && <span className="x">✓</span>}</span>
+                        return <span className={`chip tagger-chip${mine ? ' adopted' : ''}`} key={tg} title={mine ? t('taggerMine') : t('taggerAdd')}>{tg} <span className="ico">◈</span>{!mine && <span className="x add" onClick={() => addTag(card.oracleId, tg)}>+</span>}{mine && <span className="x">✓</span>}</span>
                       })}
                     </div>
                   )}
@@ -272,7 +272,7 @@ export default function CardPanel(p: Props) {
                     </div>
                     <div className="chips small">
                       {e.tags.map(tg => <span className="chip" key={tg}>#{tg}<span className="x" onClick={() => tagEdge(e.id!, tg, true)}>✕</span></span>)}
-                      <input placeholder="+ tag" value={tq} list={uid(`edge-tags-${e.id}`)} onChange={ev => setEdgeTagQ(m => ({ ...m, [e.id!]: ev.target.value }))}
+                      <input placeholder={t('plusTag')} value={tq} list={uid(`edge-tags-${e.id}`)} onChange={ev => setEdgeTagQ(m => ({ ...m, [e.id!]: ev.target.value }))}
                         onKeyDown={ev => { if (ev.key === 'Enter' && tq.trim()) { void tagEdge(e.id!, tq); setEdgeTagQ(m => ({ ...m, [e.id!]: '' })) } }} />
                       <datalist id={uid(`edge-tags-${e.id}`)}>{allEdgeTags.filter(x => !e.tags.includes(x)).map(x => <option key={x} value={x} />)}</datalist>
                     </div>
@@ -316,7 +316,7 @@ export default function CardPanel(p: Props) {
           <>
             {head(id, t('communityTitle'))}
             {!collapsed.has(id) && <>
-              <div className="row"><button onClick={community?.onRefresh}>↻ refresh 17lands</button>{community?.fetchedAt && <span className="sub">snapshot {new Date(community.fetchedAt).toLocaleDateString()}</span>}</div>
+              <div className="row"><button onClick={community?.onRefresh}>{t('refresh17')}</button>{community?.fetchedAt && <span className="sub">{tx('snapshot', { date: new Date(community.fetchedAt).toLocaleDateString() })}</span>}</div>
               {!community?.row && <div className="sub">{community ? t('notInCommunity') : t('noSnapshot')}</div>}
               {community?.row && (
                 <div className="kv">
@@ -324,7 +324,7 @@ export default function CardPanel(p: Props) {
                   <b>OH WR</b><span>{pct(community.row.opening_hand_win_rate)}</span>
                   <b>IWD</b><span>{community.row.drawn_improvement_win_rate == null ? '—' : `${(community.row.drawn_improvement_win_rate * 100).toFixed(1)}pp`}</span>
                   <b>ALSA / ATA</b><span>{community.row.avg_seen?.toFixed(2) ?? '—'} / {community.row.avg_pick?.toFixed(2) ?? '—'}</span>
-                  <b>Games</b><span>{community.row.game_count.toLocaleString()}</span>
+                  <b>{t('games')}</b><span>{community.row.game_count.toLocaleString()}</span>
                 </div>
               )}
             </>}
@@ -380,7 +380,7 @@ export default function CardPanel(p: Props) {
         return shown.map((x, i) => (
           <Fragment key={x.id}>
             {x.node}
-            {i < shown.length - 1 && <div className="sec-divider" onPointerDown={grab(x.id)} title="drag to resize the section above" />}
+            {i < shown.length - 1 && <div className="sec-divider" onPointerDown={grab(x.id)} title={t('dragResize')} />}
           </Fragment>
         ))
       })()}

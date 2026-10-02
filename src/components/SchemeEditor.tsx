@@ -50,7 +50,7 @@ export default function SchemeEditor({ scheme, onClose }: Props) {
           onDragOver={e => { e.preventDefault(); if (overIdx !== i) setOverIdx(i) }}
           onDragLeave={() => setOverIdx(cur => (cur === i ? null : cur))}
           onDrop={e => { e.preventDefault(); setOverIdx(null); drop(i); setDragIdx(null) }}>
-          <span className="grip" title="drag to reorder">⠿</span>
+          <span className="grip" title={T('dragReorder')}>⠿</span>
           <input type="text" value={x.name} onChange={e => update(i, { name: e.target.value })} />
           <input type="color" value={x.color} onChange={e => update(i, { color: e.target.value })} />
           <button onClick={() => setTiers(ts => ts.filter((_, j) => j !== i))}>✕</button>

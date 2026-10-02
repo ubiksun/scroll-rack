@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { SetMeta } from '../db'
 import { listSets, type ScryfallSetListItem } from '../api/scryfall'
-import { standardSets, tierOf, TIER_LABEL, TIER_ORDER, type Tier } from '../api/formats'
+import { standardSets, tierOf, TIER_ORDER, type Tier } from '../api/formats'
+import { t, tx } from '../i18n'
+
+const TIER_LABEL: Record<Tier, () => string> = { standard: () => t('fmtStandard'), pioneer: () => t('fmtPioneer'), modern: () => t('fmtModern'), other: () => t('fmtOther') }
 
 interface Props {
   local: SetMeta[]
@@ -47,16 +50,16 @@ export default function SetPicker({ local, active, onToggle, onPull, onPullMany,
     return f ? all.filter(r => r.code.includes(f) || r.name.toLowerCase().includes(f)) : all
   }, [remote, local, q, standard])
 
-  const label = active.length ? active.map(c => c.toUpperCase()).join(' + ') : 'Sets'
+  const label = active.length ? active.map(c => c.toUpperCase()).join(' + ') : t('setsBtn')
   let lastTier: Tier | null = null
   return (
     <span className="menu-wrap" ref={wrap}>
       <button data-tour="sets" onClick={() => setOpen(v => !v)}>{label} ▾</button>
       {open && (
         <div className="menu setmenu">
-          <input autoFocus placeholder="filter sets…" value={q} onChange={e => setQ(e.target.value)} />
+          <input autoFocus placeholder={t('filterSets')} value={q} onChange={e => setQ(e.target.value)} />
           {err && <div className="sub">{err}</div>}
-          {!remote.length && !err && <div className="sub">loading set list…</div>}
+          {!remote.length && !err && <div className="sub">{t('loadingSets')}</div>}
           <div className="setlist">
             {rows.map(r => {
               const cached = localBy.get(r.code)
@@ -65,23 +68,23 @@ export default function SetPicker({ local, active, onToggle, onPull, onPullMany,
               const tierRows = rows.filter(x => x.tier === r.tier && x.released_at <= today)
               const divider = r.tier !== lastTier ? (
                 <div className="setdivider" key={`d-${r.tier}`}>
-                  <span>{TIER_LABEL[r.tier]}</span>
-                  {r.tier !== 'other' && <button onClick={() => onPullMany(tierRows.map(x => x.code))} title={`Load & activate all ${tierRows.length} released sets in this group (${tierRows.filter(x => !localBy.has(x.code)).length} still to download)`}>load all {tierRows.length}</button>}
+                  <span>{TIER_LABEL[r.tier]()}</span>
+                  {r.tier !== 'other' && <button onClick={() => onPullMany(tierRows.map(x => x.code))} title={tx('loadAllHint', { n: tierRows.length, m: tierRows.filter(x => !localBy.has(x.code)).length })}>{tx('loadAll', { n: tierRows.length })}</button>}
                 </div>
               ) : null
               lastTier = r.tier
               return (
                 <div key={r.code} style={{ display: 'contents' }}>
                   {divider}
-                  <div className={`setrow${on ? ' on' : ''}${unreleased ? ' unreleased' : ''}`} title={unreleased ? `releases ${r.released_at} — preview cards only` : (cached ? 'click: show / hide' : 'click: download & show')}
+                  <div className={`setrow${on ? ' on' : ''}${unreleased ? ' unreleased' : ''}`} title={unreleased ? tx('unreleasedHint', { date: r.released_at }) : (cached ? t('clickShowHide') : t('clickDownloadShow'))}
                     onClick={e => { if ((e.target as HTMLElement).closest('button')) return; onToggle(r.code) }}>
                     <input type="checkbox" checked={on} readOnly />
                     <span className="code">{r.code.toUpperCase()}</span>
                     <span className="name">{r.name}</span>
                     <span className="sub">{r.released_at}</span>
                     {busy === r.code ? <span className="sub">…</span>
-                      : cached ? <button title={`cached ${cached.cardCount} cards · click to re-fetch`} onClick={e => { e.stopPropagation(); onPull(r.code) }}>✓ {cached.cardCount} ↻</button>
-                      : <button title="download from Scryfall" onClick={e => { e.stopPropagation(); onPull(r.code) }}>↓</button>}
+                      : cached ? <button title={tx('cachedHint', { n: cached.cardCount })} onClick={e => { e.stopPropagation(); onPull(r.code) }}>✓ {cached.cardCount} ↻</button>
+                      : <button title={t('downloadHint')} onClick={e => { e.stopPropagation(); onPull(r.code) }}>↓</button>}
                   </div>
                 </div>
               )

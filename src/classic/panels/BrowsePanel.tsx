@@ -28,9 +28,9 @@ export default function BrowsePanel() {
     <div className="pane">
       <div className="topbar sub-bar">
         <div className="group search-group" data-tour="search">
-          <input placeholder={s.q.searchScope === 'all' ? 'Search all of Scryfall (Scryfall syntax) …' : t('search')} value={s.draft} onChange={e => s.setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); s.submit() } }} className={`search${s.searchState === 'error' ? ' err' : ''}${s.draft !== s.q.textF ? ' dirty' : ''}`} />
+          <input placeholder={s.q.searchScope === 'all' ? t('searchAllPh') : t('search')} value={s.draft} onChange={e => s.setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); s.submit() } }} className={`search${s.searchState === 'error' ? ' err' : ''}${s.draft !== s.q.textF ? ' dirty' : ''}`} />
           <button className={s.draft !== s.q.textF ? 'active' : ''} onClick={s.submit} title={t('searchGo')}>🔍</button>
-          <button data-tour="scope" className={s.q.searchScope === 'all' ? 'active' : ''} onClick={() => s.patch({ searchScope: s.q.searchScope === 'all' ? 'active' : 'all' })} title={s.q.searchScope === 'all' ? 'Searching every set on Scryfall (results are cached as you open them). Click to search only the active sets.' : 'Searching the active sets only. Click to search all of Scryfall.'}>{s.q.searchScope === 'all' ? '🌐 all sets' : '▣ active sets'}</button>
+          <button data-tour="scope" className={s.q.searchScope === 'all' ? 'active' : ''} onClick={() => s.patch({ searchScope: s.q.searchScope === 'all' ? 'active' : 'all' })} title={s.q.searchScope === 'all' ? t('scopeAllHint') : t('scopeActiveHint')}>{s.q.searchScope === 'all' ? t('scopeAll') : t('scopeActive')}</button>
           <span className="status">{s.searchState === 'busy' ? t('searching') : s.searchState === 'error' ? t('syntaxError') : s.searchState === 'local' ? t('localSearch') : ''}</span>
         </div>
         <div className="group">

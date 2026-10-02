@@ -1,5 +1,7 @@
 # Scroll Rack — Privacy Policy
 
+English · [简体中文](PRIVACY.zh-CN.md)
+
 _Last updated: 2026-09-21_
 
 Scroll Rack is a browser extension for rating and annotating Magic: The Gathering cards. It is designed so that your data never leaves your browser.

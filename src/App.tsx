@@ -4,7 +4,7 @@ import { DockviewReact, themeLight, type DockviewApi, type DockviewReadyEvent } 
 import 'dockview-react/dist/styles/dockview.css'
 import { importBundle, getSetting, setSetting } from './db'
 import { exportCsv, exportDecklist, exportGraph, exportJson, exportMarkdown } from './export'
-import { t } from './i18n'
+import { t, tx } from './i18n'
 import { GraderProvider, useGrader } from './state'
 import { DEFAULT_QUERY, TIER_SEP, type SerializedQuery, type SortRule } from './query'
 import { addDock, asDock, defaultLayout, DOCK_KINDS, LAYOUT_VERSION, legacySeed, migrateChannels, openBlock, type DockKind } from './docks'
@@ -16,7 +16,7 @@ import OraclePopover from './components/OraclePopover'
 import CoachTour from './components/CoachTour'
 import ClassicShell from './classic/App'
 import { DOCK_COMPONENTS } from './panels/TabPanel'
-import { checkForUpdate, currentVersion, type LatestInfo } from './update'
+import { checkForUpdate, currentVersion, notesOf, type LatestInfo } from './update'
 import { FEATURES } from './features'
 import { useDockKeyboard } from './hooks/useDockKeyboard'
 
@@ -104,7 +104,7 @@ function WiredShell({ dockRef, openOptions }: { dockRef: MutableRefObject<Dockvi
 
   if (!g.ready) return null
   const communityForCsv = () => new Map(g.cards.map(c => [c.name, { gih: g.communityRows.get(c.name)?.ever_drawn_win_rate ?? null, pct: g.percentiles.get(c.name) }]))
-  const doImport = async (f: File | undefined) => { if (!f) return; try { await importBundle(JSON.parse(await f.text())); g.setStatus(`Imported ${f.name}`) } catch (e) { g.setStatus(String(e)) } }
+  const doImport = async (f: File | undefined) => { if (!f) return; try { await importBundle(JSON.parse(await f.text())); g.setStatus(tx('stImported', { name: f.name })) } catch (e) { g.setStatus(String(e)) } }
   // the decklist export follows the search dock last touched — that's the list you are looking at
   const exportCurrentList = () => {
     const r = g.navOf(g.activeScopeId)
@@ -127,24 +127,24 @@ function WiredShell({ dockRef, openOptions }: { dockRef: MutableRefObject<Dockvi
               </div>
             )}
           </span>
-          <button onClick={resetLayout} title={t('resetLayout')}>⟲ layout</button>
+          <button onClick={resetLayout} title={t('resetLayout')}>{t('resetLayoutBtn')}</button>
         </div>
         <span className="spacer" />
         <div className="group">
           <span className="menu-wrap">
-            <button onClick={() => setExportOpen(v => !v)} title="Download your data as files">{t('export')} ▾</button>
+            <button onClick={() => setExportOpen(v => !v)} title={t('exportHint')}>{t('export')} ▾</button>
             {exportOpen && (
               <div className="menu" onClick={() => setExportOpen(false)}>
                 <div onClick={exportJson}>{t('exportJson')}</div>
-                {g.activeSets.map(code => g.contexts.map(ctx => <div key={code + ctx.id} onClick={() => exportCsv(code, ctx, communityForCsv())}>CSV — {code.toUpperCase()} · {ctx.name}</div>))}
-                {g.activeSets.map(code => <div key={code} onClick={() => exportMarkdown(code, g.contexts, g.schemes)}>Markdown / Obsidian — {code.toUpperCase()}</div>)}
+                {g.activeSets.map(code => g.contexts.map(ctx => <div key={code + ctx.id} onClick={() => exportCsv(code, ctx, communityForCsv())}>{tx('exportCsvItem', { set: code.toUpperCase(), ctx: ctx.name })}</div>))}
+                {g.activeSets.map(code => <div key={code} onClick={() => exportMarkdown(code, g.contexts, g.schemes)}>{tx('exportMdItem', { set: code.toUpperCase() })}</div>)}
                 <div onClick={exportCurrentList}>{t('exportList')}</div>
                 {FEATURES.links && <div onClick={exportGraph}>{t('exportGraph')}</div>}
               </div>
             )}
           </span>
-          <label className="row"><button onClick={e => (e.currentTarget.nextElementSibling as HTMLInputElement).click()} title="Merge a JSON backup from another machine">{t('import')}</button><input type="file" accept="application/json" hidden onChange={e => doImport(e.target.files?.[0])} /></label>
-          <button className="gear" data-tour="gear" onClick={openOptions} title="Options / 设定" aria-label="Options"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <label className="row"><button onClick={e => (e.currentTarget.nextElementSibling as HTMLInputElement).click()} title={t('importHint')}>{t('import')}</button><input type="file" accept="application/json" hidden onChange={e => doImport(e.target.files?.[0])} /></label>
+          <button className="gear" data-tour="gear" onClick={openOptions} title={t('optionsBtn')} aria-label={t('optionsBtn')}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
       </div>
 
@@ -154,8 +154,8 @@ function WiredShell({ dockRef, openOptions }: { dockRef: MutableRefObject<Dockvi
 
       {latest && (
         <div className="update-banner">
-          New version <b>v{latest.version}</b> available (you have v{currentVersion()}). <a href={latest.zip} target="_blank" rel="noreferrer">Download zip</a> → unzip over your existing folder → chrome://extensions ↻. Your data is kept.
-          {latest.notes && <span className="sub"> · {latest.notes}</span>}
+          {tx('updateNew', { v: latest.version, cur: currentVersion() })} <a href={latest.zip} target="_blank" rel="noreferrer">{t('downloadZip')}</a> {t('updateHow')}
+          {notesOf(latest) && <span className="sub"> · {notesOf(latest)}</span>}
           <button onClick={() => setLatest(null)} style={{ marginLeft: 'auto' }}>✕</button>
         </div>
       )}

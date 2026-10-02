@@ -1,5 +1,7 @@
 # Scroll Rack (Chrome extension)
 
+English · [简体中文](README.zh-CN.md)
+
 **Scroll Rack is a browser extension for rating and annotating Magic: The Gathering cards.**
 
 Rate every card on as many **comments** as you like (Limited / Constructed / …, each with its own tier ladder), keep
@@ -18,7 +20,6 @@ ratings and notes live in Chrome's profile, not in that folder, so they survive 
 ## Roadmap
 
 - Auto-tags: Scryfall Tagger `otag:` (bulk `oracle_tags`) as first source, rules-text heuristics second, LLM batch offline third
-- 大學院廢墟 (mtgch) overlay
 - Review scorecard (Spearman vs 17lands / vs reviewer aggregates, ±1 tier hit rate) once a set is stable
 
 ## Legal

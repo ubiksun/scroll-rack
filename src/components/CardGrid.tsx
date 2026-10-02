@@ -55,7 +55,7 @@ export default function CardGrid({ cards, badgesFor, selectedId, onSelect, onOpe
             draggable onDragStart={e => { setCardDrag(e, c, nameOf ? nameOf(c) : c.name); e.dataTransfer.effectAllowed = 'all' }}>
             <img src={imageOf(c, size)} alt={c.name} loading="lazy" draggable={false} />
             <BadgeStacks badges={badgesFor(c)} />
-            {linkedIds.has(c.oracleId) && <span className="dot" title="has links" />}
+            {linkedIds.has(c.oracleId) && <span className="dot" title={t('hasLinks')} />}
             {p !== undefined && <span className="comm">P{p}</span>}
           </div>
         )
