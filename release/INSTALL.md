@@ -1,4 +1,4 @@
-# Scroll Rack v0.14.1 — Install Guide / 安装说明
+# Scroll Rack v0.14.0 — Install Guide / 安装说明
 
 **Chrome Web Store: https://chromewebstore.google.com/detail/scroll-rack/oejlhhgcahmkcocomlkocjccnandkmdp**
 
@@ -11,7 +11,7 @@ The steps below are only needed for side-loading a build that is not on the stor
 
 ### Install
 
-1. Unzip `scroll-rack-v0.14.1.zip` to a folder you will keep — Chrome loads the extension from it every time.
+1. Unzip `scroll-rack-v0.14.0.zip` to a folder you will keep — Chrome loads the extension from it every time.
 2. Open `chrome://extensions`.
 3. Turn on **Developer mode** (top right).
 4. **Load unpacked** → pick the unzipped folder (the one that contains `manifest.json`).
@@ -53,7 +53,7 @@ Please note **which view** (Grid / Card / Comments / scryfall.com), **what you e
 
 ### 安装
 
-1. 把 `scroll-rack-v0.14.1.zip` 解压到一个**长期保留**的位置(Chrome 之后一直从这里读取)。
+1. 把 `scroll-rack-v0.14.0.zip` 解压到一个**长期保留**的位置(Chrome 之后一直从这里读取)。
 2. 地址栏输入 `chrome://extensions`。
 3. 右上角开启**开发者模式**。
 4. **加载已解压的扩展程序** → 选择解压出的文件夹(直接包含 `manifest.json` 的那一层)。

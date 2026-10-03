@@ -3,7 +3,7 @@
 // Run before a release commit:  node scripts/copy-review.mjs [out.md]
 // Sources: src/i18n.ts (app UI), public/_locales (manifest + scryfall.com overlay),
 // release/latest.json (update banner), CHANGELOG.md, release/PUBLISH.md (store listing),
-// README / PRIVACY / release/INSTALL (docs). Usage column = files referencing the key (dead keys go to the appendix).
+// README / PRIVACY / release/INSTALL (single-file bilingual docs). Usage column = files referencing the key (dead keys go to the appendix).
 import { build } from 'esbuild'
 import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname, relative } from 'node:path'
@@ -85,14 +85,7 @@ md += '```\nEN: First-run guide; search runs on Enter; click selects, double-cli
 
 // --- D. flags
 H('## D · 需要你决定的点 Decisions')
-P(`1. **分页 vs 标签页** — 面板标签在中文里现为「分页」(${(zh ? Object.values(zh).join(' ').split('分页').length - 1 : 0)} 处);Chrome 自身叫「标签页」。保留或全局替换?
-2. **「」 vs “”** — 中文字串里引用控件名时用「」(${Object.values(zh).join(' ').split('「').length - 1} 处),英文用 “ ”。简体出版惯例是 “ ”,但「」在界面里更醒目。保留或替换?
-3. **CHANGELOG / Release 顺序** — 每个版本先英文后中文(同一节内);GitHub Release 正文直接贴这一节。接受或改成两个独立版块?
-4. **版本号** — 这批改动只有文案(新增 i18n 键 + 覆盖层本地化 + 文档),建议发 **v0.14.1**;\`latest.json\` 同时补上 \`notes\`(英文)。或者只重写 v0.14.0 的 Release 正文、不发新版?
-5. **zh_TW** — 目前与 zh_CN 同为简体(你 9/28 的决定:产品中文一律简体)。繁体用户的 Chrome 会读 zh_TW;如删掉该目录,他们会看到英文。保留简体、删掉、还是日后补繁体?
-6. **README roadmap** — 「大學院廢墟 (mtgch) overlay」已在 v0.10 上线,建议从 roadmap 移除(README.md + README.zh-CN.md)。
-7. **已保存布局里的面板标题不会随语言切换** — 标题(Search 1 / Card / Oracle)在保存时写入布局;切换界面语言后需 ⟲ layout 才更新。接受(写进已知问题)或做迁移?
-8. **\`aboutAuthor: Designed by Ubiksun / 设计:Ubiksun\`** — 关于页署名,确认用词。`)
+P(`已拍板(10/2):分页、「」保留;CHANGELOG 每版同节先英后中;zh_TW 暂与 zh_CN 同为简体;已保存布局的面板标题不随语言切换(已写入已知问题);README / PRIVACY / INSTALL 各为单文件双语(顶部锚点)。新增需要决定的点写在这里。`)
 
 // --- E. changelog + release notes
 H('## E · CHANGELOG(= GitHub Release v0.14.0 正文)')
@@ -109,8 +102,8 @@ md += cut(pub, '## Store listing text (简体中文)').replace(/^## /m, '### ') 
 // --- G. docs
 H('## G · 文档 Docs(GitHub 仓库首页 / 隐私政策 / 侧载说明)')
 md += '| file | status |\n|---|---|\n'
-md += '| `README.md` | English · 顶部链接到 README.zh-CN.md |\n| `README.zh-CN.md` | 简体中文全文(新) |\n| `PRIVACY.md` | English · 顶部链接到 PRIVACY.zh-CN.md |\n| `PRIVACY.zh-CN.md` | 简体中文全文(新) |\n| `release/INSTALL.md` | 单文件双语:English 段 + 简体中文 段 |\n\n'
-for (const f of ['README.md', 'README.zh-CN.md', 'PRIVACY.md', 'PRIVACY.zh-CN.md', 'release/INSTALL.md']) {
+md += '| `README.md` | 单文件双语:顶部锚点 English / 简体中文 |\n| `PRIVACY.md` | 单文件双语:顶部锚点 English / 简体中文 |\n| `release/INSTALL.md` | 单文件双语:English 段 + 简体中文 段 |\n\n'
+for (const f of ['README.md', 'PRIVACY.md', 'release/INSTALL.md']) {
   H(`### G · \`${f}\``)
   md += rd(f).replace(/^(#+) /gm, (_, h) => '#'.repeat(Math.min(h.length + 3, 6)) + ' ') + '\n'
 }

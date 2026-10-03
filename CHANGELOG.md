@@ -6,28 +6,6 @@ One section per version, newest first; each version in English, then 简体中�
 每个版本一节,最新在上;每节先英文,后简体中文。写效果,不写实现。
 `scripts/release.sh "英文一句" "中文一句"` 生成应用内更新横幅的说明;GitHub Release 正文用本文件对应的一节;商店「新功能」栏贴同一段。
 
-## v0.14.1 — 2026-10-02
-
-Copy-only release: everything a user can read now exists in English and 简体中文.
-
-### Changed
-- All interface text follows the interface language; strings that were English-only (sort menu, set list, tooltips, status line, export menu, update banner, Oracle panel) are now translated.
-- The scryfall.com panel and badges follow the browser language.
-- The update banner shows release notes in the interface language.
-- README, privacy policy and install guide have 简体中文 versions.
-
-### Known issue
-- Panel titles stored in a saved layout keep the language they were saved in; ⟲ layout refreshes them.
-
-### 变更
-- 全部界面文字跟随界面语言;原先只有英文的字串(排序菜单、系列列表、提示、状态栏、导出菜单、更新横幅、规则文字面板)已翻译。
-- scryfall.com 上的面板与徽章跟随浏览器语言。
-- 更新横幅按界面语言显示版本说明。
-- README、隐私政策、安装说明提供简体中文版。
-
-### 已知问题
-- 已保存布局中的面板标题保留保存时的语言;按 ⟲ 布局 刷新。
-
 ## v0.14.0 — 2026-10-01
 
 ### Added
@@ -37,7 +15,7 @@ Copy-only release: everything a user can read now exists in English and 简体�
 - Links: drag a card from the grid onto the card panel to link the two; the "Link to a card" box supports ↑ ↓ and Enter and searches Scryfall from 3 letters; linked cards stack beside the card image.
 - ⚙ Workspace: save, load, export and import named layouts.
 - ⚙ Experimental → Wired panels: Image, Comments and Oracle follow a Search panel through the dot on their tab; three link styles switchable under ⚙ Display.
-- Interface and card language follow the browser language on first run.
+- Interface and card language follow the browser language on first run; every interface string, the scryfall.com panel and the update banner exist in English and 简体中文.
 
 ### Changed
 - Chinese interface is Simplified; the Chinese name is 卷轴架.
@@ -57,6 +35,9 @@ Copy-only release: everything a user can read now exists in English and 简体�
 - FRA "Way of the …" mirror pairs were wrong (207↔239, 208↔255, 223↔254, 224↔267, 238↔268); cached FRA data is recomputed.
 - A mirror partner no longer also appears in the links list.
 
+### Known issue
+- Panel titles stored in a saved layout keep the language they were saved in; ⟲ layout refreshes them.
+
 ### 新增
 - 首次使用引导:七步遮罩引导,逐步高亮真实控件(系列、搜索、搜索范围、打开单卡、标签、链接、评分),目标区域在引导中可直接操作;左上角「开始使用」清单保留到四项完成。⚙ 关于 →「查看引导」可重开。
 - 搜索按钮:输入不再即时查询,按 Enter 或 🔍 才向 Scryfall 发送。
@@ -64,7 +45,7 @@ Copy-only release: everything a user can read now exists in English and 简体�
 - 链接:把网格中的卡拖到单卡面板即建立链接;「链接到卡」输入框支持 ↑ ↓ 选择、Enter 确认,3 个字以上同时搜索 Scryfall。已链接的卡以堆叠形式显示在卡图右侧。
 - ⚙ 工作区:保存、加载、导出、导入命名布局。
 - ⚙ 实验性功能 → 连动面板:卡图、评语、规则文字面板通过标签页上的圆点跟随某个搜索,三种连动样式可在 ⚙ 显示 切换。
-- 首次启动时界面与卡牌语言跟随浏览器语言。
+- 首次启动时界面与卡牌语言跟随浏览器语言;全部界面文字、scryfall.com 面板与更新横幅均有英文与简体中文。
 
 ### 变更
 - 界面中文改为简体;中文名称为「卷轴架」。
@@ -83,6 +64,9 @@ Copy-only release: everything a user can read now exists in English and 简体�
 - 同一对卡可能被记录两次链接,启动时自动合并既有重复。
 - FRA「Way of the …」五对镜像配对错误(207↔239、208↔255、223↔254、224↔267、238↔268),已缓存的 FRA 自动重算。
 - 镜像伙伴不再同时出现在链接列表中。
+
+### 已知问题
+- 已保存布局中的面板标题保留保存时的语言;按 ⟲ 布局 刷新。
 
 ## v0.10.0 — 2026-09-22
 
